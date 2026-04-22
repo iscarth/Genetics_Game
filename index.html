@@ -1,0 +1,1911 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bio376 Genetics Review Game — UH Hilo</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- React + ReactDOM -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <!-- Babel (in-browser JSX transpilation) -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    body { margin: 0; padding: 0; background: #f1f5f9; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useCallback } = React;
+
+
+/* ============================================================
+   BIO376 GENETICS REVIEW GAME — UH Hilo, Spring 2026
+   Single-file React app. No build step. Tailwind via CDN.
+   All content drawn from Bio376 lecture slides.
+   ============================================================ */
+
+// ── Zone configuration ──────────────────────────────────────
+const ZONES = [
+  { id: 1, name: "Mendelian Foundations",      short: "Mendelian",   emoji: "🧬",
+    bg:"bg-blue-50",   border:"border-blue-400", text:"text-blue-800",
+    header:"bg-blue-600", spaceBg:"bg-blue-100", spaceActive:"bg-blue-300" },
+  { id: 2, name: "Chromosomes & Linkage",       short: "Chromosomes", emoji: "🔬",
+    bg:"bg-green-50",  border:"border-green-400",text:"text-green-800",
+    header:"bg-green-600",spaceBg:"bg-green-100",spaceActive:"bg-green-300" },
+  { id: 3, name: "Bacterial Genetics & Genomes",short: "Bacteria",    emoji: "🦠",
+    bg:"bg-orange-50", border:"border-orange-400",text:"text-orange-800",
+    header:"bg-orange-500",spaceBg:"bg-orange-100",spaceActive:"bg-orange-300" },
+  { id: 4, name: "Molecular Genetics",          short: "Molecular",   emoji: "⚗️",
+    bg:"bg-purple-50", border:"border-purple-400",text:"text-purple-800",
+    header:"bg-purple-600",spaceBg:"bg-purple-100",spaceActive:"bg-purple-300" },
+  { id: 5, name: "Evolution & Pop. Genetics",   short: "Evolution",   emoji: "🌿",
+    bg:"bg-red-50",    border:"border-red-400",  text:"text-red-800",
+    header:"bg-red-600",   spaceBg:"bg-red-100",  spaceActive:"bg-red-300" },
+];
+const zoneOf = (s) => ZONES[Math.ceil(s / 6) - 1];
+
+const PCOLORS = [
+  { name:"Crimson",bg:"bg-red-500",  ring:"ring-red-500",  hex:"#DC2626" },
+  { name:"Ocean",  bg:"bg-blue-500", ring:"ring-blue-500", hex:"#2563EB" },
+  { name:"Forest", bg:"bg-green-600",ring:"ring-green-600",hex:"#16A34A" },
+  { name:"Amber",  bg:"bg-yellow-500",ring:"ring-yellow-500",hex:"#D97706" },
+];
+
+const shuffle = (arr) => [...arr].sort(() => Math.random() - 0.5);
+
+// ── Question bank ────────────────────────────────────────────
+// Format: id, zone (1-5), difficulty (easy|medium|hard), type
+//   multiple_choice: options[], correct ("A"-"D")
+//   true_false:      correct ("True"|"False")
+//   matching:        pairs [{term,match}]
+//   ordering:        items[], correct_order[]
+//   punnett:         cross, row_gametes[], col_gametes[], correct_cells[], cell_options[],
+//                    ratio_prompt, ratio_options[], ratio_correct
+//   error_id:        options[], correct ("A"-"D")  (prompt contains erroneous statement)
+const QUESTIONS = [
+
+  // ══════════════════════════════════════════════════════════
+  // ZONE 1 — MENDELIAN FOUNDATIONS  (10 easy, 8 medium, 6 hard)
+  // ══════════════════════════════════════════════════════════
+
+  // — Easy —
+  { id:"z1_e1", zone:1, difficulty:"easy", type:"multiple_choice",
+    prompt:"Mendel's Law of Segregation states that during gamete formation, the two alleles of a gene:",
+    options:["Always remain together in the same gamete","Separate so each gamete receives exactly one allele","Both travel to the egg","Recombine randomly with alleles of other genes"],
+    correct:"B",
+    explanation:"The principle of segregation states that paired hereditary determinants separate so each gamete is equally likely to contain either member of the pair." },
+
+  { id:"z1_e2", zone:1, difficulty:"easy", type:"multiple_choice",
+    prompt:"In the F2 generation of a monohybrid cross (Aa × Aa), the expected phenotypic ratio is:",
+    options:["1:1","1:2:1","3:1","9:3:3:1"],
+    correct:"C",
+    explanation:"With complete dominance, 3/4 of F2 offspring show the dominant phenotype (AA and Aa) and 1/4 show the recessive phenotype (aa), giving a 3:1 ratio." },
+
+  { id:"z1_e3", zone:1, difficulty:"easy", type:"true_false",
+    prompt:"Males are said to be hemizygous for X-linked genes because they have only one copy of each X-linked gene.",
+    correct:"True",
+    explanation:"Males have a single X chromosome (XY), so they have only one copy of each X-linked gene—called hemizygous. An X-linked recessive allele is always expressed in males." },
+
+  { id:"z1_e4", zone:1, difficulty:"easy", type:"multiple_choice",
+    prompt:"During which stage of meiosis does crossing over (recombination) occur?",
+    options:["Metaphase I","Prophase I","Anaphase II","Telophase II"],
+    correct:"B",
+    explanation:"Crossing over occurs during Prophase I of meiosis, specifically during the Pachytene substage when homologous chromosomes are synapsed as bivalents." },
+
+  { id:"z1_e5", zone:1, difficulty:"easy", type:"multiple_choice",
+    prompt:"An AaBb × AaBb dihybrid cross produces what expected F2 phenotypic ratio?",
+    options:["1:2:1","3:1","1:1:1:1","9:3:3:1"],
+    correct:"D",
+    explanation:"Independent assortment of two genes each with complete dominance produces the classic 9:3:3:1 ratio (9 A_B_ : 3 A_bb : 3 aaB_ : 1 aabb) in the F2." },
+
+  { id:"z1_e6", zone:1, difficulty:"easy", type:"true_false",
+    prompt:"In an autosomal dominant pedigree, on average half of the children of an affected parent will also be affected.",
+    correct:"True",
+    explanation:"An affected parent with genotype Dd (heterozygous dominant, the common situation) passes the dominant allele to about 50% of offspring, each of whom will be affected." },
+
+  { id:"z1_e7", zone:1, difficulty:"easy", type:"multiple_choice",
+    prompt:"In a chi-square (χ²) goodness-of-fit test, the degrees of freedom equals:",
+    options:["The total number of offspring","The number of phenotypic classes","The number of phenotypic classes minus 1","The expected value divided by the observed value"],
+    correct:"C",
+    explanation:"Degrees of freedom = number of phenotypic classes – 1. For a monohybrid cross with 2 classes (dominant and recessive), df = 1." },
+
+  { id:"z1_e8", zone:1, difficulty:"easy", type:"multiple_choice",
+    prompt:"Codominance refers to a situation in which:",
+    options:["One allele masks the other","Both alleles are fully expressed in a heterozygous individual","The heterozygote has an intermediate phenotype","The recessive allele is only partially expressed"],
+    correct:"B",
+    explanation:"Codominance means both alleles are fully expressed in heterozygotes; neither is dominant or recessive over the other. An example is the ABO blood type system." },
+
+  { id:"z1_e9", zone:1, difficulty:"easy", type:"true_false",
+    prompt:"During anaphase of mitosis, sister chromatids separate and move to opposite poles.",
+    correct:"True",
+    explanation:"In mitotic anaphase, the proteins holding sister chromatids together are dissolved, the spindle fibers shorten, and each chromatid (now a daughter chromosome) moves to an opposite pole." },
+
+  { id:"z1_e10", zone:1, difficulty:"easy", type:"multiple_choice",
+    prompt:"If a male inherits an X-linked recessive allele, he expresses the trait because:",
+    options:["Males always express recessive traits","The Y chromosome does not carry a wild-type counterpart of the gene","Males have two copies of X-linked genes","X-linked genes are always fully expressed"],
+    correct:"B",
+    explanation:"Males are hemizygous for X-linked genes. Without a second X chromosome to carry a dominant wild-type allele, any recessive allele on the X will be expressed." },
+
+  // — Medium —
+  { id:"z1_m1", zone:1, difficulty:"medium", type:"ordering",
+    prompt:"Arrange the stages of MITOSIS in the correct sequential order:",
+    items:["Telophase","Prophase","Anaphase","Metaphase"],
+    correct_order:["Prophase","Metaphase","Anaphase","Telophase"],
+    explanation:"Mitosis proceeds as PMAT: Prophase (chromosomes condense) → Metaphase (align at equator) → Anaphase (sister chromatids separate) → Telophase (nuclear membranes reform)." },
+
+  { id:"z1_m2", zone:1, difficulty:"medium", type:"matching",
+    prompt:"Match each genetic term to its correct definition:",
+    pairs:[
+      { term:"Law of Segregation",     match:"Allele pairs separate during gamete formation; each gamete gets one allele" },
+      { term:"Law of Independent Assortment", match:"Alleles of different genes segregate independently of one another" },
+      { term:"Hemizygosity",           match:"Having only one copy of a gene, as in males for X-linked loci" },
+      { term:"Codominance",            match:"Both alleles are fully expressed in the heterozygote" },
+    ],
+    explanation:"These four terms describe fundamental principles of Mendelian and sex-linked inheritance as taught in Bio376." },
+
+  { id:"z1_m3", zone:1, difficulty:"medium", type:"ordering",
+    prompt:"Arrange the stages of MEIOSIS I in the correct sequential order:",
+    items:["Anaphase I","Telophase I","Prophase I","Metaphase I"],
+    correct_order:["Prophase I","Metaphase I","Anaphase I","Telophase I"],
+    explanation:"Meiosis I: Prophase I (synapsis, crossing over) → Metaphase I (bivalents align) → Anaphase I (homologs separate — basis of segregation) → Telophase I (two haploid cells form)." },
+
+  { id:"z1_m4", zone:1, difficulty:"medium", type:"matching",
+    prompt:"Match each pedigree clue to the likely mode of inheritance:",
+    pairs:[
+      { term:"Two unaffected parents → affected child",           match:"Autosomal recessive" },
+      { term:"Trait appears every generation; males and females equally affected", match:"Autosomal dominant" },
+      { term:"Trait almost exclusively in males; carrier mothers", match:"X-linked recessive" },
+      { term:"Affected males all have an affected mother",         match:"X-linked dominant or X-linked recessive" },
+    ],
+    explanation:"Pattern recognition in pedigrees relies on generational continuity (dominant), skipping generations (recessive), and sex-specificity (X-linked)." },
+
+  { id:"z1_m5", zone:1, difficulty:"medium", type:"matching",
+    prompt:"Match each type of allele interaction to its description:",
+    pairs:[
+      { term:"Complete dominance",     match:"One allele fully masks the other in heterozygotes" },
+      { term:"Incomplete dominance",   match:"Heterozygote shows a blended intermediate phenotype" },
+      { term:"Codominance",            match:"Both alleles are simultaneously and fully expressed" },
+      { term:"Recessive",              match:"Allele expressed only in homozygous form" },
+    ],
+    explanation:"These categories describe how alleles interact at the same locus to produce phenotype in heterozygotes." },
+
+  { id:"z1_m6", zone:1, difficulty:"medium", type:"ordering",
+    prompt:"Arrange the steps of a chi-square goodness-of-fit test in the correct order:",
+    items:["Calculate χ² = Σ(O−E)²/E","Compare χ² to critical value from table","State the null hypothesis","Determine degrees of freedom","Record observed (O) and calculate expected (E) values"],
+    correct_order:["State the null hypothesis","Record observed (O) and calculate expected (E) values","Determine degrees of freedom","Calculate χ² = Σ(O−E)²/E","Compare χ² to critical value from table"],
+    explanation:"The chi-square test tests the null hypothesis that observed data fit the expected ratio. If χ² exceeds the critical value (p < 0.05), the null hypothesis is rejected." },
+
+  { id:"z1_m7", zone:1, difficulty:"medium", type:"matching",
+    prompt:"Match each meiosis stage to its key chromosomal event:",
+    pairs:[
+      { term:"Prophase I",   match:"Synapsis and crossing over between homologous chromosomes" },
+      { term:"Anaphase I",   match:"Homologous chromosomes separate — basis of Mendel's Law of Segregation" },
+      { term:"Anaphase II",  match:"Sister chromatids separate, analogous to mitotic anaphase" },
+      { term:"Metaphase I",  match:"Bivalents (tetrads) align at the metaphase plate" },
+    ],
+    explanation:"Meiosis produces haploid gametes through two successive divisions. The key events of each stage determine how alleles are distributed to gametes." },
+
+  { id:"z1_m8", zone:1, difficulty:"medium", type:"ordering",
+    prompt:"Arrange the five substages of Prophase I in the correct order:",
+    items:["Diakinesis","Zygotene","Pachytene","Diplotene","Leptotene"],
+    correct_order:["Leptotene","Zygotene","Pachytene","Diplotene","Diakinesis"],
+    explanation:"The substages of Prophase I are Leptotene (chromosomes first visible) → Zygotene (synapsis begins) → Pachytene (crossing over) → Diplotene (bivalents repel) → Diakinesis (bivalents contract)." },
+
+  // — Hard —
+  { id:"z1_h1", zone:1, difficulty:"hard", type:"punnett",
+    prompt:"Complete the Punnett square for a monohybrid cross: Aa × Aa. Each cell should show the genotype of offspring formed by that combination of gametes.",
+    cross:"Aa × Aa",
+    row_gametes:["A","a"],
+    col_gametes:["A","a"],
+    correct_cells:["AA","Aa","Aa","aa"],
+    cell_options:["AA","Aa","aA","aa"],
+    ratio_prompt:"Assuming complete dominance, what is the PHENOTYPIC ratio produced by this cross?",
+    ratio_options:["1 AA : 2 Aa : 1 aa","3 dominant : 1 recessive","1 dominant : 1 recessive","All offspring show the dominant phenotype"],
+    ratio_correct:"B",
+    explanation:"Aa × Aa yields 1 AA : 2 Aa : 1 aa (genotypic 1:2:1). With complete dominance AA and Aa are phenotypically identical, giving a 3:1 phenotypic ratio." },
+
+  { id:"z1_h2", zone:1, difficulty:"hard", type:"punnett",
+    prompt:"A carrier female (X^N X^n) crosses with a normal male (X^N Y). Fill in the Punnett square. X^n is the recessive allele causing disease.",
+    cross:"X^N X^n (carrier ♀) × X^N Y (normal ♂)",
+    row_gametes:["X^N","X^n"],
+    col_gametes:["X^N","Y"],
+    correct_cells:["X^N X^N","X^N Y","X^N X^n","X^n Y"],
+    cell_options:["X^N X^N","X^N X^n","X^n X^N","X^N Y","X^n Y","X^n X^n"],
+    ratio_prompt:"What proportion of SONS will be affected (show the recessive trait)?",
+    ratio_options:["All sons","1/4 of all offspring","1/2 of sons","None of the sons"],
+    ratio_correct:"C",
+    explanation:"Sons receive the Y from father and either X^N or X^n from mother. Half the sons are X^N Y (unaffected) and half are X^n Y (affected, hemizygous recessive)." },
+
+  { id:"z1_h3", zone:1, difficulty:"hard", type:"error_id",
+    prompt:"The following statement contains an error — identify what is wrong:\n\n\"During Anaphase II of meiosis, homologous chromosomes separate and move to opposite poles of the cell.\"",
+    options:[
+      "Homologous chromosomes never separate during meiosis",
+      "Homologous chromosomes separate during Anaphase I, not Anaphase II; Anaphase II separates sister chromatids",
+      "Anaphase II does not exist in meiosis",
+      "The statement is correct — homologs do separate in Anaphase II"
+    ],
+    correct:"B",
+    explanation:"Homologous chromosomes separate in Anaphase I (the reductional division). Anaphase II is the equational division where sister chromatids split — analogous to mitotic anaphase." },
+
+  { id:"z1_h4", zone:1, difficulty:"hard", type:"error_id",
+    prompt:"A student analyzes a pedigree and concludes: \"Two phenotypically unaffected parents who produce an affected child must be segregating an autosomal DOMINANT allele.\"\n\nWhat is wrong with this conclusion?",
+    options:[
+      "Unaffected parents can only produce affected children via sex-linked inheritance",
+      "Two unaffected parents producing an affected child is the hallmark of AUTOSOMAL RECESSIVE inheritance — both parents are carriers (Aa)",
+      "Dominant traits can never skip a generation so the conclusion is correct",
+      "An affected child from two unaffected parents implies a new mutation"
+    ],
+    correct:"B",
+    explanation:"If the trait were autosomal dominant, at least one parent would be affected (since they would carry the dominant allele). Two unaffected parents each carrying one recessive allele (Aa × Aa) can produce homozygous recessive (aa) affected offspring — autosomal recessive." },
+
+  { id:"z1_h5", zone:1, difficulty:"hard", type:"punnett",
+    prompt:"In snapdragons, flower color shows incomplete dominance: RR = red, Rr = pink, rr = white. Complete the Punnett square for Rr × Rr.",
+    cross:"Rr × Rr (incomplete dominance)",
+    row_gametes:["R","r"],
+    col_gametes:["R","r"],
+    correct_cells:["RR","Rr","Rr","rr"],
+    cell_options:["RR","Rr","rR","rr"],
+    ratio_prompt:"What is the phenotypic ratio expected in this cross?",
+    ratio_options:["3 red : 1 white","1 red : 2 pink : 1 white","All pink","1 red : 1 white"],
+    ratio_correct:"B",
+    explanation:"With incomplete dominance, Rr × Rr gives 1 RR (red) : 2 Rr (pink) : 1 rr (white). The phenotypic and genotypic ratios are the same (1:2:1) because heterozygotes have their own distinct phenotype." },
+
+  { id:"z1_h6", zone:1, difficulty:"hard", type:"error_id",
+    prompt:"A student evaluates a chi-square result and states:\n\n\"The χ² value was 2.1 with 1 degree of freedom. Since p > 0.05, the data DO NOT fit the expected 3:1 ratio.\"",
+    options:[
+      "The degrees of freedom are wrong — it should be 2",
+      "p > 0.05 means we FAIL TO REJECT the null hypothesis — the data ARE consistent with the 3:1 ratio",
+      "A χ² of 2.1 is always significant",
+      "The conclusion is correct"
+    ],
+    correct:"B",
+    explanation:"In the chi-square goodness-of-fit test, if p > 0.05 we fail to reject the null hypothesis, meaning the data are consistent with (fit) the expected ratio. A p > 0.05 supports, not refutes, the model." },
+
+  // ══════════════════════════════════════════════════════════
+  // ZONE 2 — CHROMOSOMES & LINKAGE  (10 easy, 8 medium, 6 hard)
+  // ══════════════════════════════════════════════════════════
+
+  // — Easy —
+  { id:"z2_e1", zone:2, difficulty:"easy", type:"multiple_choice",
+    prompt:"One map unit (centimorgan, cM) is equivalent to:",
+    options:["One million base pairs of DNA","1% recombination frequency between two genes","One crossover per chromosome","The length of one Okazaki fragment"],
+    correct:"B",
+    explanation:"One map unit = one centimorgan (cM) = 1% recombination frequency. This is the standard unit of genetic distance on a linkage map." },
+
+  { id:"z2_e2", zone:2, difficulty:"easy", type:"true_false",
+    prompt:"Linked genes on the same chromosome always show the 1:1:1:1 parental-class ratio expected from independent assortment in a testcross.",
+    correct:"False",
+    explanation:"Linkage causes a significant deviation from the 1:1:1:1 ratio in a testcross (AaBb × aabb). Parental-type offspring are more frequent than recombinant-type offspring because the genes tend to travel together." },
+
+  { id:"z2_e3", zone:2, difficulty:"easy", type:"multiple_choice",
+    prompt:"A karyotype is best defined as:",
+    options:["A diagram of all genes on a chromosome","A photographic display of an organism's chromosomes arranged by size and morphology","A genetic map showing recombination distances","The complete DNA sequence of an organism's genome"],
+    correct:"B",
+    explanation:"A karyotype is a photographic or digital display of an individual's chromosomes arranged by size and centromere position, used to detect chromosomal abnormalities." },
+
+  { id:"z2_e4", zone:2, difficulty:"easy", type:"multiple_choice",
+    prompt:"Trisomy 21, in which an individual has three copies of chromosome 21, is also known as:",
+    options:["Turner syndrome","Klinefelter syndrome","Down syndrome","Cri-du-chat syndrome"],
+    correct:"C",
+    explanation:"Down syndrome results from trisomy 21 (2n+1 = 47 chromosomes). It is the most common viable autosomal trisomy and arises most often from nondisjunction during meiosis." },
+
+  { id:"z2_e5", zone:2, difficulty:"easy", type:"true_false",
+    prompt:"Broad-sense heritability (H²) includes additive, dominance, AND epistatic components of genetic variance.",
+    correct:"True",
+    explanation:"Broad-sense heritability H² = σ²g / σ²p, where σ²g = σ²A + σ²D + σ²E (additive + dominance + epistatic variance). Narrow-sense heritability h² includes only the additive component." },
+
+  { id:"z2_e6", zone:2, difficulty:"easy", type:"multiple_choice",
+    prompt:"In a three-point testcross, which class of offspring is present at the LOWEST frequency?",
+    options:["Parental types","Single recombinants in region I","Single recombinants in region II","Double recombinants"],
+    correct:"D",
+    explanation:"Double recombinants require simultaneous crossing over in both intervals, which is much less likely than a single crossover. They are always the rarest reciprocal class in a three-point cross." },
+
+  { id:"z2_e7", zone:2, difficulty:"easy", type:"true_false",
+    prompt:"Polygenic traits are controlled by multiple genes each with small additive effects, resulting in a continuous distribution of phenotypes.",
+    correct:"True",
+    explanation:"Polygenic (quantitative) traits are influenced by alleles at many loci, each contributing a small additive effect. This produces a bell-shaped continuous distribution rather than discrete phenotypic classes." },
+
+  { id:"z2_e8", zone:2, difficulty:"easy", type:"multiple_choice",
+    prompt:"A translocation is a chromosomal abnormality in which:",
+    options:["A chromosome segment is duplicated in place","A chromosomal segment breaks off and attaches to a different chromosome","A chromosome segment flips and reattaches in reverse orientation","A chromosome is present in three copies instead of two"],
+    correct:"B",
+    explanation:"A translocation occurs when a segment of one chromosome breaks off and attaches to a non-homologous chromosome. It is distinct from an inversion (segment flips) or duplication." },
+
+  { id:"z2_e9", zone:2, difficulty:"easy", type:"multiple_choice",
+    prompt:"The phenotypic correlation between monozygotic (identical) twins for a trait approximates which heritability measure?",
+    options:["Narrow-sense heritability (h²)","Broad-sense heritability (H²)","The selection differential","The additive variance only"],
+    correct:"B",
+    explanation:"Monozygotic (MZ) twins share all their genetic material. The correlation in phenotype between MZ twins for a trait approximates H² (broad-sense heritability), which includes all genetic variance." },
+
+  { id:"z2_e10", zone:2, difficulty:"easy", type:"true_false",
+    prompt:"Recombinant-type offspring from a testcross carry allele combinations that DIFFER from the parental (grandparental) chromosomes.",
+    correct:"True",
+    explanation:"Parental-type offspring carry the original allele combinations from the parents of the F1. Recombinant types carry new combinations produced by crossing over during meiosis in the F1." },
+
+  // — Medium —
+  { id:"z2_m1", zone:2, difficulty:"medium", type:"matching",
+    prompt:"Match each chromosomal structural abnormality to its correct description:",
+    pairs:[
+      { term:"Inversion",       match:"Chromosome segment breaks off, flips 180°, and reattaches in reverse orientation" },
+      { term:"Translocation",   match:"Segment from one chromosome breaks off and attaches to a non-homologous chromosome" },
+      { term:"Deletion",        match:"A chromosomal segment is missing entirely" },
+      { term:"Duplication",     match:"A chromosomal segment is present in two (or more) copies on the same chromosome" },
+    ],
+    explanation:"These structural abnormalities differ from numerical abnormalities (trisomy, monosomy) because they involve rearrangements of chromosome segments rather than changes in chromosome number." },
+
+  { id:"z2_m2", zone:2, difficulty:"medium", type:"matching",
+    prompt:"Match each genetic mapping term to its definition:",
+    pairs:[
+      { term:"Recombination frequency",  match:"Number of recombinant offspring divided by total offspring scored" },
+      { term:"Map unit (centimorgan)",   match:"Unit of genetic distance equal to 1% recombination" },
+      { term:"Parental type",            match:"Offspring carrying the original allele combinations from the P generation" },
+      { term:"Genetic map",              match:"Diagram showing linear gene order with distances proportional to recombination frequency" },
+    ],
+    explanation:"Genetic maps are built from recombination frequencies measured in testcrosses. One map unit equals 1% recombination frequency between two markers." },
+
+  { id:"z2_m3", zone:2, difficulty:"medium", type:"ordering",
+    prompt:"Arrange the steps for determining gene order from a THREE-POINT CROSS in the correct order:",
+    items:["Calculate map distances for each interval","Identify the double recombinant class (rarest reciprocal pair)","Compare with parental class to find which allele is in the middle","Identify the parental class (most common reciprocal pair)","Draw the corrected genetic map"],
+    correct_order:["Identify the parental class (most common reciprocal pair)","Identify the double recombinant class (rarest reciprocal pair)","Compare with parental class to find which allele is in the middle","Calculate map distances for each interval","Draw the corrected genetic map"],
+    explanation:"The double recombinant class is key — it identifies which gene is in the middle because the middle gene appears to have switched position relative to the flanking genes compared to the parental class." },
+
+  { id:"z2_m4", zone:2, difficulty:"medium", type:"matching",
+    prompt:"Match each heritability variance component to its correct definition:",
+    pairs:[
+      { term:"Additive variance (σ²A)",   match:"Variance due to the average effects of alleles regardless of which genotype they are in" },
+      { term:"Dominance variance (σ²D)",  match:"Variance due to interactions between alleles at the same locus" },
+      { term:"Epistatic variance (σ²E)",  match:"Variance due to interactions between alleles at different loci" },
+      { term:"Narrow-sense heritability (h²)", match:"Ratio of additive genetic variance to total phenotypic variance; used to predict response to selection" },
+    ],
+    explanation:"Narrow-sense heritability h² = σ²A / σ²p is most important for predicting the response to artificial selection because only additive effects are transmitted consistently to offspring." },
+
+  { id:"z2_m5", zone:2, difficulty:"medium", type:"matching",
+    prompt:"Match each relative relationship to its expected phenotypic correlation coefficient for a quantitative trait:",
+    pairs:[
+      { term:"Monozygotic twins",            match:"≈ H² (broad-sense heritability)" },
+      { term:"Offspring and one parent",     match:"≈ h²/2 (half of narrow-sense heritability)" },
+      { term:"Half-siblings",                match:"≈ h²/4" },
+      { term:"Offspring and mid-parent value",match:"≈ h²" },
+    ],
+    explanation:"Phenotypic correlations between relatives depend on the fraction of genes shared. MZ twins share 100% of genes, giving a correlation ≈ H². The offspring–midparent regression slope directly estimates h²." },
+
+  { id:"z2_m6", zone:2, difficulty:"medium", type:"ordering",
+    prompt:"Arrange the steps for calculating a MAP DISTANCE from testcross data in the correct order:",
+    items:["Multiply recombination fraction by 100 to get cM","Count recombinant offspring in each class","Divide total recombinants by total offspring scored","Count total offspring from testcross"],
+    correct_order:["Count total offspring from testcross","Count recombinant offspring in each class","Divide total recombinants by total offspring scored","Multiply recombination fraction by 100 to get cM"],
+    explanation:"Map distance (in cM) = (number of recombinant offspring / total offspring) × 100. For example, 79 recombinants out of 740 total = 79/740 × 100 = 10.7 cM." },
+
+  { id:"z2_m7", zone:2, difficulty:"medium", type:"matching",
+    prompt:"Match each linkage configuration term to its description:",
+    pairs:[
+      { term:"Cis (coupling) configuration",  match:"Two dominant alleles are on the same chromosome: AB / ab" },
+      { term:"Trans (repulsion) configuration",match:"Dominant alleles are on opposite chromosomes: Ab / aB" },
+      { term:"Linkage",                        match:"Non-allelic genes on the same chromosome tend to stay together in meiosis" },
+      { term:"Interference",                   match:"The effect of one crossover on the probability of a second crossover nearby" },
+    ],
+    explanation:"Cis and trans configurations in a heterozygote affect which gametes are the parental types vs. recombinant types, but do not affect the recombination frequency between the loci." },
+
+  { id:"z2_m8", zone:2, difficulty:"medium", type:"ordering",
+    prompt:"Arrange the steps in the logic of identifying a LINKED gene pair from testcross results, in order:",
+    items:["Perform a chi-square test to assess significance of deviation","Compare observed classes to expected 1:1:1:1 ratio","Carry out AaBb × aabb testcross","Conclude linkage if deviation is statistically significant","Record offspring phenotype frequencies"],
+    correct_order:["Carry out AaBb × aabb testcross","Record offspring phenotype frequencies","Compare observed classes to expected 1:1:1:1 ratio","Perform a chi-square test to assess significance of deviation","Conclude linkage if deviation is statistically significant"],
+    explanation:"If genes are linked, the parental-type classes are more frequent than recombinant classes, causing a significant deviation from the 1:1:1:1 ratio expected under independent assortment." },
+
+  // — Hard —
+  { id:"z2_h1", zone:2, difficulty:"hard", type:"error_id",
+    prompt:"A student writes: \"A translocation is when a chromosomal segment breaks off, flips around 180°, and reattaches in reverse orientation on the same chromosome.\"\n\nWhat is wrong with this statement?",
+    options:[
+      "The statement is correct — translocation and inversion are the same thing",
+      "The student described an INVERSION, not a translocation. A translocation involves a segment moving to a DIFFERENT chromosome",
+      "Chromosome segments cannot flip orientation",
+      "Translocations only occur in cancer cells"
+    ],
+    correct:"B",
+    explanation:"The student described an inversion. A translocation is when a chromosome segment breaks off and attaches to a non-homologous chromosome. An inversion is the rearrangement where the segment flips and reattaches on the same chromosome." },
+
+  { id:"z2_h2", zone:2, difficulty:"hard", type:"error_id",
+    prompt:"A genetics student states: \"Recombination frequency between two very distantly linked genes can exceed 50%, making them appear to assort independently or even show negative association.\"\n\nIdentify the error:",
+    options:[
+      "Recombination can exceed 50% for distantly linked genes",
+      "The maximum recombination frequency is 50% — beyond 50 cM, genes appear to assort independently even if on the same chromosome",
+      "Genes on the same chromosome always show linkage regardless of distance",
+      "Negative association between linked genes is common and expected"
+    ],
+    correct:"B",
+    explanation:"Recombination frequency has an upper limit of 50% (equivalent to independent assortment). When genes are very far apart on the same chromosome, multiple crossovers cause them to appear unlinked, but the frequency cannot mathematically exceed 50%." },
+
+  { id:"z2_h3", zone:2, difficulty:"hard", type:"punnett",
+    prompt:"Two genes are located 20 cM apart on the same chromosome in coupling (cis): AB/ab heterozygote crossed with ab/ab.\n\nFill in the gamete class frequencies (use the 2×2 table where row gametes are from the heterozygous parent).",
+    cross:"AB/ab × ab/ab (20 cM apart)",
+    row_gametes:["AB (parental)","ab (parental)","Ab (recomb.)","aB (recomb.)"],
+    col_gametes:["ab"],
+    correct_cells:["40%","40%","10%","10%"],
+    cell_options:["10%","20%","40%","50%"],
+    ratio_prompt:"What are the RECOMBINANT offspring classes and their expected frequency?",
+    ratio_options:["Ab and aB, each 40%","AB and ab, each 10%","Ab and aB, each 10%","All classes equal at 25%"],
+    ratio_correct:"C",
+    explanation:"With 20 cM distance, 20% of gametes are recombinant: 10% Ab and 10% aB. The parental gametes (AB and ab) each make up 40% of gametes. Thus recombinant offspring = 20% total." },
+
+  { id:"z2_h4", zone:2, difficulty:"hard", type:"error_id",
+    prompt:"An instructor states: \"Broad-sense heritability and narrow-sense heritability give the same prediction for the response to artificial selection.\"\n\nWhat is the error?",
+    options:[
+      "Both heritabilities predict the same response to selection",
+      "Only narrow-sense heritability (h²) predicts response to selection, because only additive genetic variance is reliably passed from parents to offspring",
+      "Broad-sense heritability always overestimates the response to selection",
+      "Heritability has no relationship to the response to selection"
+    ],
+    correct:"B",
+    explanation:"Response to selection = h² × selection differential. Only narrow-sense (h²) is used because dominance and epistatic effects do not breed true — they are unpredictably reshuffled each generation. H² can only be used for clonally propagated organisms." },
+
+  { id:"z2_h5", zone:2, difficulty:"hard", type:"error_id",
+    prompt:"A student reading a karyotype report states: \"This individual has 45 chromosomes total (monosomy X = 45, X0). Since they are missing the second sex chromosome, they must be male.\"\n\nWhat is the error?",
+    options:[
+      "45,X0 individuals are chromosomally female (Turner syndrome), not male — sex is determined by the presence of the Y chromosome",
+      "The statement is correct — 45,X0 is always male",
+      "Monosomy X always results in lethality",
+      "Sex is determined by chromosome number, not sex chromosome composition"
+    ],
+    correct:"A",
+    explanation:"45,X (Turner syndrome) individuals have a single X chromosome and no Y chromosome. They develop as phenotypically female but with ovarian dysgenesis and other features. Male sex determination requires the SRY gene on the Y chromosome." },
+
+  { id:"z2_h6", zone:2, difficulty:"hard", type:"error_id",
+    prompt:"A student says: \"In a three-point cross, I can ignore the double recombinant class since it's so rare — removing it won't affect my gene-order determination.\"\n\nWhy is this wrong?",
+    options:[
+      "The student is correct — the double recombinants are too rare to matter",
+      "The double recombinant class identifies which gene is in the MIDDLE; ignoring it makes it impossible to determine gene order",
+      "Double recombinants only exist in theoretical calculations",
+      "Gene order must be determined from parental classes only"
+    ],
+    correct:"B",
+    explanation:"The double recombinant class is crucial for gene-order determination: compare it to the parental class — the one gene whose allele arrangement has flipped relative to the parental combination is the middle gene." },
+
+  // ══════════════════════════════════════════════════════════
+  // ZONE 3 — BACTERIAL GENETICS & GENOMES  (10 easy, 8 medium, 6 hard)
+  // ══════════════════════════════════════════════════════════
+
+  // — Easy —
+  { id:"z3_e1", zone:3, difficulty:"easy", type:"multiple_choice",
+    prompt:"Bacterial transformation is defined as:",
+    options:["Transfer of DNA via a bacterial virus (phage)","Uptake of free DNA from the environment by a bacterial cell","Transfer of DNA through direct cell-to-cell contact via a pilus","Insertion of a plasmid into the bacterial chromosome"],
+    correct:"B",
+    explanation:"Transformation is the uptake and incorporation of free DNA from the environment. Cells capable of taking up DNA are called 'competent.' This mechanism was first demonstrated by Griffith and later explained by Avery, MacLeod, and McCarty." },
+
+  { id:"z3_e2", zone:3, difficulty:"easy", type:"true_false",
+    prompt:"In bacterial conjugation, the F⁺ cell is the DONOR that transfers DNA to the F⁻ recipient cell.",
+    correct:"True",
+    explanation:"The F plasmid (fertility factor) in F⁺ cells encodes proteins needed to form a sex pilus and transfer DNA. The F⁺ cell is always the donor; the F⁻ cell is the recipient." },
+
+  { id:"z3_e3", zone:3, difficulty:"easy", type:"multiple_choice",
+    prompt:"The abbreviation 'Hfr' in bacterial genetics stands for:",
+    options:["High-frequency replication","Heterozygous fluorescent recombinant","High-frequency recombination","Homologous fragment recombination"],
+    correct:"C",
+    explanation:"Hfr (High Frequency Recombination) strains arise when the F plasmid integrates into the bacterial chromosome. Hfr × F⁻ matings produce recombinants at a frequency more than 1000 times higher than F⁺ × F⁻ matings." },
+
+  { id:"z3_e4", zone:3, difficulty:"easy", type:"multiple_choice",
+    prompt:"Which type of transduction can transfer ANY gene from the bacterial chromosome?",
+    options:["Specialized transduction","Generalized transduction","Conjugative transduction","Transformational transduction"],
+    correct:"A",
+    explanation:"Generalized transduction occurs when a phage accidentally packages random fragments of bacterial DNA instead of phage DNA. It can transfer any bacterial gene. Specialized transduction only transfers genes adjacent to the phage integration site." },
+
+  { id:"z3_e5", zone:3, difficulty:"easy", type:"true_false",
+    prompt:"The Meselson-Stahl experiment (1958) provided direct evidence that DNA replication is semi-conservative.",
+    correct:"True",
+    explanation:"Meselson and Stahl grew bacteria in ¹⁵N medium, then shifted to ¹⁴N. After one generation, all DNA was intermediate density (hybrid); after two generations, hybrid and light DNA appeared — consistent only with semi-conservative replication." },
+
+  { id:"z3_e6", zone:3, difficulty:"easy", type:"multiple_choice",
+    prompt:"Okazaki fragments are short segments of newly synthesized DNA that:",
+    options:["Form on the leading strand during continuous synthesis","Form on the lagging strand and are later joined by DNA ligase","Are produced during mismatch repair","Serve as primers for leading-strand synthesis"],
+    correct:"B",
+    explanation:"Because DNA polymerase can only synthesize in the 5'→3' direction, the lagging strand is made discontinuously as a series of short fragments (Okazaki fragments) that are later joined by DNA ligase." },
+
+  { id:"z3_e7", zone:3, difficulty:"easy", type:"true_false",
+    prompt:"Transposable elements are DNA sequences that can move (transpose) from one location in the genome to another.",
+    correct:"True",
+    explanation:"Transposable elements (transposons) are 'jumping genes' that can relocate within the genome. They include DNA transposons and retrotransposons and make up a large fraction of most eukaryotic genomes." },
+
+  { id:"z3_e8", zone:3, difficulty:"easy", type:"multiple_choice",
+    prompt:"The leading strand in DNA replication is synthesized:",
+    options:["Discontinuously in the direction away from the replication fork","Continuously in the 5'→3' direction toward the replication fork","In the 3'→5' direction by a specialized polymerase","Only after the lagging strand is complete"],
+    correct:"B",
+    explanation:"The leading strand is synthesized continuously in the 5'→3' direction toward the replication fork, requiring only a single RNA primer at the origin. The lagging strand is synthesized discontinuously in the opposite direction." },
+
+  { id:"z3_e9", zone:3, difficulty:"easy", type:"multiple_choice",
+    prompt:"Satellite DNA is characterized by:",
+    options:["Unique sequences that code for important proteins","Highly repetitive sequences that band at a different buoyant density from main-band DNA in CsCl gradients","Single-copy sequences found throughout the genome","DNA sequences that satellite around origins of replication"],
+    correct:"B",
+    explanation:"Satellite DNA consists of highly repetitive short sequences. Its atypical base composition causes it to form a 'satellite' band separate from bulk genomic DNA when centrifuged in a cesium chloride (CsCl) buoyant-density gradient." },
+
+  { id:"z3_e10", zone:3, difficulty:"easy", type:"true_false",
+    prompt:"Specialized transduction can only transfer bacterial genes located near the phage integration site (attachment site).",
+    correct:"True",
+    explanation:"In specialized transduction (e.g., λ phage), during faulty excision the phage takes bacterial DNA flanking its integration site. Only genes near the att site can be packaged — unlike generalized transduction which can transfer any gene." },
+
+  // — Medium —
+  { id:"z3_m1", zone:3, difficulty:"medium", type:"matching",
+    prompt:"Match each mechanism of bacterial genetic exchange to its defining feature:",
+    pairs:[
+      { term:"Transformation",  match:"Recipient cell takes up naked DNA from the environment; requires competent cells" },
+      { term:"Conjugation",     match:"DNA transferred through direct cell-to-cell contact via a sex pilus; requires F factor" },
+      { term:"Generalized transduction", match:"Phage accidentally packages random bacterial DNA; any gene can be transferred" },
+      { term:"Specialized transduction", match:"Phage packages genes adjacent to its chromosomal integration site during faulty excision" },
+    ],
+    explanation:"All three mechanisms — transformation, conjugation, and transduction — increase bacterial genetic diversity by transferring DNA horizontally between cells (horizontal gene transfer)." },
+
+  { id:"z3_m2", zone:3, difficulty:"medium", type:"matching",
+    prompt:"Match each DNA replication component to its function:",
+    pairs:[
+      { term:"DNA polymerase III",  match:"Main enzyme that synthesizes new DNA strands in the 5'→3' direction" },
+      { term:"Primase",             match:"Synthesizes the short RNA primer needed to start each new DNA strand" },
+      { term:"DNA ligase",          match:"Joins Okazaki fragments on the lagging strand by forming phosphodiester bonds" },
+      { term:"Helicase",            match:"Unwinds the double helix at the replication fork by breaking hydrogen bonds" },
+    ],
+    explanation:"DNA replication requires a coordinated set of enzymes. DNA polymerase cannot initiate new strands without a primer, which is why primase is essential for both leading- and lagging-strand synthesis." },
+
+  { id:"z3_m3", zone:3, difficulty:"medium", type:"ordering",
+    prompt:"Arrange the steps of Hfr × F⁻ CONJUGATION in the correct order:",
+    items:["Homologous recombination integrates donor DNA into recipient chromosome","Recipient remains F⁻ (full F factor is usually not transferred)","Hfr chromosome begins transferring via rolling-circle replication","Sex pilus forms between Hfr and F⁻ cells","Mating cells break apart; transfer stops"],
+    correct_order:["Sex pilus forms between Hfr and F⁻ cells","Hfr chromosome begins transferring via rolling-circle replication","Mating cells break apart; transfer stops","Homologous recombination integrates donor DNA into recipient chromosome","Recipient remains F⁻ (full F factor is usually not transferred)"],
+    explanation:"In Hfr × F⁻ crosses, chromosomal genes closest to the F integration site are transferred earliest and most frequently. Mating cells usually break apart before the entire chromosome (and the trailing F factor) is transferred, so the recipient stays F⁻." },
+
+  { id:"z3_m4", zone:3, difficulty:"medium", type:"matching",
+    prompt:"Match each type of repetitive DNA to its description:",
+    pairs:[
+      { term:"Satellite DNA",         match:"Highly repetitive short sequences that form a separate band in CsCl buoyant-density gradients" },
+      { term:"Tandem repeats",        match:"Multiple copies of a sequence arranged consecutively in the same genomic region" },
+      { term:"Transposable elements", match:"Mobile DNA sequences that can insert into new genomic locations" },
+      { term:"Simple sequence repeats (SSRs)", match:"Short-unit tandem repeats used as genetic markers; also called microsatellites" },
+    ],
+    explanation:"Repetitive DNA makes up a large fraction of most eukaryotic genomes. Tandem repeats occur in arrays at centromeres and telomeres; transposons are dispersed throughout the genome." },
+
+  { id:"z3_m5", zone:3, difficulty:"medium", type:"ordering",
+    prompt:"Arrange the steps of the MESELSON-STAHL experiment in the correct order:",
+    items:["Shift bacteria from ¹⁵N to ¹⁴N medium; allow one generation of growth","Extract DNA and centrifuge in CsCl gradient","Grow bacteria in heavy ¹⁵N medium for many generations","Observe one hybrid (intermediate) band — consistent with semi-conservative replication","After two generations, observe both hybrid and light DNA bands"],
+    correct_order:["Grow bacteria in heavy ¹⁵N medium for many generations","Shift bacteria from ¹⁵N to ¹⁴N medium; allow one generation of growth","Extract DNA and centrifuge in CsCl gradient","Observe one hybrid (intermediate) band — consistent with semi-conservative replication","After two generations, observe both hybrid and light DNA bands"],
+    explanation:"The Meselson-Stahl result — a single hybrid band after one generation and a hybrid + light band after two generations — uniquely supports semi-conservative replication, ruling out conservative or dispersive models." },
+
+  { id:"z3_m6", zone:3, difficulty:"medium", type:"matching",
+    prompt:"Match each DNA repair mechanism to its description:",
+    pairs:[
+      { term:"Mismatch repair",          match:"Recognizes mismatched bases after replication and excises the newly synthesized strand for correction" },
+      { term:"Nucleotide-excision repair",match:"Multi-enzyme complex recognizes bulky lesions, excises a patch of single-stranded DNA, and resynthesizes" },
+      { term:"Photoreactivation",         match:"Light-activated enzyme (photolyase) directly reverses thymine dimers caused by UV exposure" },
+      { term:"DNA damage bypass",         match:"Specialized polymerases replicate over lesions, skipping damage at reduced accuracy" },
+    ],
+    explanation:"Multiple DNA repair pathways correct different types of damage. The parental (template) strand is usually methylated, allowing mismatch-repair enzymes to distinguish the original strand from the newly synthesized erroneous strand." },
+
+  { id:"z3_m7", zone:3, difficulty:"medium", type:"ordering",
+    prompt:"Arrange the steps of bacterial TRANSFORMATION in the correct order:",
+    items:["Donor DNA fragment undergoes recombination with recipient chromosome","Recipient cell binds and takes up donor DNA fragment","Transformed cells are selected on appropriate medium","Competent cells are exposed to donor DNA","Uptake machinery degrades one strand; single-stranded DNA enters the cell"],
+    correct_order:["Competent cells are exposed to donor DNA","Recipient cell binds and takes up donor DNA fragment","Uptake machinery degrades one strand; single-stranded DNA enters the cell","Donor DNA fragment undergoes recombination with recipient chromosome","Transformed cells are selected on appropriate medium"],
+    explanation:"Transformation requires competent cells (able to take up DNA), physical uptake of DNA, and recombination with the chromosome for stable inheritance. The efficiency depends on the competence state of the recipient." },
+
+  { id:"z3_m8", zone:3, difficulty:"medium", type:"matching",
+    prompt:"Match each property to either GENERALIZED or SPECIALIZED transduction:",
+    pairs:[
+      { term:"Any bacterial gene can be transferred",                          match:"Generalized transduction" },
+      { term:"Only genes near the phage attachment site (att) are transferred", match:"Specialized transduction" },
+      { term:"Results from phage accidentally packaging random host DNA",      match:"Generalized transduction" },
+      { term:"Results from imprecise prophage excision",                       match:"Specialized transduction" },
+    ],
+    explanation:"Lambda (λ) phage is the classic example of specialized transduction; P1 phage is a classic example of generalized transduction. The distinction lies in whether the phage packages random or site-specific bacterial DNA." },
+
+  // — Hard —
+  { id:"z3_h1", zone:3, difficulty:"hard", type:"error_id",
+    prompt:"A student writes: \"In an Hfr × F⁻ mating, the recipient cell usually becomes F⁺ because the F factor is transferred early in conjugation.\"\n\nWhat is wrong with this statement?",
+    options:[
+      "The statement is correct — recipients always become F⁺",
+      "In Hfr × F⁻ matings, the recipient usually STAYS F⁻ because the F factor is at the TRAILING end of the chromosome and is rarely fully transferred before cells break apart",
+      "F⁻ cells cannot receive any DNA from Hfr cells",
+      "Hfr cells transfer only the F factor, not chromosomal genes"
+    ],
+    correct:"B",
+    explanation:"In Hfr strains, the F factor is integrated into the chromosome with the origin of transfer at one end. About 100 minutes are required to transfer the entire E. coli chromosome, but cells typically break apart before transfer completes, so the F factor (at the trailing end) is rarely transferred and the recipient stays F⁻." },
+
+  { id:"z3_h2", zone:3, difficulty:"hard", type:"error_id",
+    prompt:"A student states: \"Generalized transduction can only transfer bacterial genes that are located immediately adjacent to the phage integration site.\"\n\nIdentify the error:",
+    options:[
+      "The statement is correct — generalized transduction is site-specific",
+      "The student confused generalized with SPECIALIZED transduction. Generalized transduction transfers RANDOM bacterial DNA fragments; specialized transduction transfers genes near the att site",
+      "Neither type of transduction transfers bacterial genes",
+      "Generalized transduction only works in gram-positive bacteria"
+    ],
+    correct:"B",
+    explanation:"Generalized transduction occurs when a phage accidentally packages random fragments of the bacterial chromosome — any gene can be transferred. Specialized transduction is the site-specific mechanism where imprecise phage excision captures flanking bacterial genes." },
+
+  { id:"z3_h3", zone:3, difficulty:"hard", type:"error_id",
+    prompt:"A lab report states: \"DNA polymerase synthesizes the new strand in the 3'→5' direction, adding nucleotides to the 3' end of the growing chain.\"\n\nWhat is the error?",
+    options:[
+      "DNA polymerase does not add nucleotides to the chain",
+      "DNA polymerase synthesizes in the 5'→3' direction — it adds nucleotides to the free 3'-OH end of the existing strand, moving in the 5'→3' direction",
+      "DNA polymerase moves in the 3'→5' direction along the template strand",
+      "The statement is correct"
+    ],
+    correct:"B",
+    explanation:"DNA polymerase adds new nucleotides to the 3'-OH end of the growing strand, so synthesis proceeds in the 5'→3' direction. It reads the template strand in the 3'→5' direction but synthesizes the new strand 5'→3'." },
+
+  { id:"z3_h4", zone:3, difficulty:"hard", type:"punnett",
+    prompt:"In interrupted mating experiments, four genes (a, b, c, d) are mapped by their time of entry into the F⁻ recipient. Gene a enters at 5 min, b at 12 min, c at 20 min, d at 35 min.\n\nWhich gene pair would recombine most frequently?",
+    cross:"Interrupted mating (time-of-entry mapping)",
+    row_gametes:["Gene a","Gene b","Gene c","Gene d"],
+    col_gametes:["Minutes"],
+    correct_cells:["5","12","20","35"],
+    cell_options:["2","5","8","12","15","20","25","35"],
+    ratio_prompt:"Which pair of genes is FARTHEST apart on the Hfr chromosome (most likely to recombine)?",
+    ratio_options:["a and b (7 min apart)","b and c (8 min apart)","c and d (15 min apart)","a and d (30 min apart)"],
+    ratio_correct:"D",
+    explanation:"Distance in an Hfr map corresponds to time of entry (minutes). Gene a enters at 5 min and gene d at 35 min — 30 minutes apart, making them the most distantly separated and most likely to show recombination between them." },
+
+  { id:"z3_h5", zone:3, difficulty:"hard", type:"error_id",
+    prompt:"A student reads: \"The initial rate of nucleotide misincorporation by DNA polymerase is about 10⁻⁵ per base pair per replication. After mismatch repair, the final error rate is approximately 10⁻⁸.\"\n\nIs this correct? If not, what is the actual final error rate?",
+    options:[
+      "The statement is correct",
+      "The initial misincorporation rate is correct, but after proofreading (99% correction) and mismatch repair (99.9% of remaining errors), the final rate is approximately 10⁻¹⁰ per base pair",
+      "The initial error rate is 10⁻³, not 10⁻⁵",
+      "Mismatch repair cannot correct errors from misincorporation"
+    ],
+    correct:"B",
+    explanation:"DNA polymerase misincorporates at ≈10⁻⁵. Proofreading by the 3'→5' exonuclease corrects 99% of errors (→ 10⁻⁷). Post-replication mismatch repair corrects 99.9% of remaining errors, giving a final rate of ≈10⁻¹⁰ per base pair — one of the most accurate processes in biology." },
+
+  { id:"z3_h6", zone:3, difficulty:"hard", type:"error_id",
+    prompt:"A student explains the Meselson-Stahl experiment: \"After TWO generations of growth in ¹⁴N medium, we expect to see ONLY light (¹⁴N/¹⁴N) DNA in the CsCl gradient if replication is semi-conservative.\"\n\nWhat is wrong?",
+    options:[
+      "The student is correct about the two-generation prediction",
+      "After two generations with semi-conservative replication, we expect BOTH intermediate-density (hybrid ¹⁵N/¹⁴N) AND light (¹⁴N/¹⁴N) DNA — NOT only light DNA",
+      "Semi-conservative replication predicts all heavy DNA after two generations",
+      "After two generations all DNA should be dispersed (mixed ¹⁵N and ¹⁴N throughout)"
+    ],
+    correct:"B",
+    explanation:"After two generations, semi-conservative replication predicts two equal bands: one hybrid (intermediate) and one light. The two original ¹⁵N strands each end up in a separate hybrid molecule; the new strands pair with ¹⁴N to give light DNA. Only conservative replication would give exclusively light DNA by generation two." },
+
+  // ══════════════════════════════════════════════════════════
+  // ZONE 4 — MOLECULAR GENETICS  (10 easy, 8 medium, 6 hard)
+  // ══════════════════════════════════════════════════════════
+
+  // — Easy —
+  { id:"z4_e1", zone:4, difficulty:"easy", type:"multiple_choice",
+    prompt:"A missense mutation is a point mutation in which:",
+    options:["A single nucleotide change creates a premature stop codon","A nucleotide change results in a different amino acid being incorporated into the protein","A nucleotide change does not alter the amino acid sequence","An extra nucleotide is inserted, shifting the reading frame"],
+    correct:"B",
+    explanation:"A missense mutation substitutes one nucleotide for another, causing a codon to specify a different amino acid. The classic example is sickle-cell anemia, where a single base change causes a glutamic acid → valine substitution in β-globin." },
+
+  { id:"z4_e2", zone:4, difficulty:"easy", type:"true_false",
+    prompt:"A silent mutation is a point mutation that changes the amino acid sequence of the encoded protein.",
+    correct:"False",
+    explanation:"Silent mutations are point mutations that do NOT change the amino acid sequence. They either occur in non-coding regions or substitute a synonymous codon (coding for the same amino acid, due to the degeneracy of the genetic code)." },
+
+  { id:"z4_e3", zone:4, difficulty:"easy", type:"multiple_choice",
+    prompt:"Which DNA repair mechanism uses a light-activated enzyme (photolyase) to directly reverse thymine dimers caused by UV radiation?",
+    options:["Mismatch repair","Nucleotide-excision repair","Photoreactivation","Base-excision repair"],
+    correct:"C",
+    explanation:"Photoreactivation uses the enzyme photolyase, which is activated by visible light, to directly break the covalent bonds of thymine dimers, restoring the original bases without excising any DNA." },
+
+  { id:"z4_e4", zone:4, difficulty:"easy", type:"multiple_choice",
+    prompt:"In eukaryotes, the TATA box is a core promoter element found approximately how far upstream of the transcription start site?",
+    options:["300–500 bp upstream","10–35 bp upstream","~30 bp upstream (−30 region)","Exactly at the +1 start site"],
+    correct:"C",
+    explanation:"The TATA box consensus sequence (5'-TATAAA-3') is found ≈ 30 bp upstream of the transcription start site (+1) in eukaryotic core promoters. The TRIID complex binds here and recruits RNA polymerase II." },
+
+  { id:"z4_e5", zone:4, difficulty:"easy", type:"true_false",
+    prompt:"Tumor suppressor genes promote cell division; when mutated, they cause uncontrolled proliferation.",
+    correct:"False",
+    explanation:"Tumor suppressor genes INHIBIT cell division and promote apoptosis. Loss of tumor suppressor function (not gain) contributes to cancer. Oncogenes are the genes that, when activated, promote cell proliferation." },
+
+  { id:"z4_e6", zone:4, difficulty:"easy", type:"multiple_choice",
+    prompt:"The universal start codon in mRNA that initiates translation is:",
+    options:["UAA","UAG","AUG","GUG"],
+    correct:"C",
+    explanation:"AUG is the start codon that encodes the amino acid methionine (in eukaryotes) or formyl-methionine (in prokaryotes). It defines the reading frame and is recognized by the initiator tRNA." },
+
+  { id:"z4_e7", zone:4, difficulty:"easy", type:"multiple_choice",
+    prompt:"miRNAs and siRNAs direct gene silencing primarily by:",
+    options:["Blocking transcription at the promoter","Binding to complementary mRNA sequences via the RISC complex, leading to mRNA degradation or translational repression","Methylating the gene's promoter region","Editing the DNA sequence of the target gene"],
+    correct:"B",
+    explanation:"miRNA and siRNA guide the RNA-induced silencing complex (RISC) to complementary mRNA sequences. RISC then cleaves or destabilizes the mRNA (or blocks translation), reducing protein production from the target gene." },
+
+  { id:"z4_e8", zone:4, difficulty:"easy", type:"true_false",
+    prompt:"In eukaryotes, RNA polymerase II cannot initiate transcription on its own — it requires the assistance of transcription factors (TFs).",
+    correct:"True",
+    explanation:"Eukaryotic RNA polymerase II needs general transcription factors (GTFs) to assemble at the promoter and form the pre-initiation complex before transcription can begin. Specific transcription factors then regulate the level of transcription." },
+
+  { id:"z4_e9", zone:4, difficulty:"easy", type:"multiple_choice",
+    prompt:"A frameshift mutation is caused by:",
+    options:["A single nucleotide substitution","Insertion or deletion of a number of nucleotides that is NOT a multiple of three, shifting the reading frame","Substitution of one purine for another","A premature stop codon generated by a point mutation"],
+    correct:"B",
+    explanation:"Frameshift mutations result from insertions or deletions of 1, 2, 4, or 5 nucleotides (any number not divisible by 3). All codons downstream of the mutation are shifted, usually producing a completely different and truncated protein." },
+
+  { id:"z4_e10", zone:4, difficulty:"easy", type:"true_false",
+    prompt:"A nonsense mutation is a point mutation that creates a premature STOP codon in the coding sequence.",
+    correct:"True",
+    explanation:"A nonsense mutation substitutes a nucleotide such that the codon changes to one of the three stop codons (UAA, UAG, UGA). This results in premature termination of translation, producing a truncated and usually nonfunctional protein." },
+
+  // — Medium —
+  { id:"z4_m1", zone:4, difficulty:"medium", type:"matching",
+    prompt:"Match each type of point mutation to its molecular consequence:",
+    pairs:[
+      { term:"Missense",  match:"One amino acid is replaced by a different amino acid in the protein" },
+      { term:"Nonsense",  match:"A codon is changed to a premature stop codon; translation terminates early" },
+      { term:"Silent",    match:"Nucleotide change that does not alter the amino acid sequence (synonymous codon)" },
+      { term:"Frameshift",match:"Insertion or deletion (not multiple of 3) shifts the entire reading frame downstream" },
+    ],
+    explanation:"These four mutation categories describe the functional consequences at the protein level. Transitions (purine↔purine or pyrimidine↔pyrimidine) and transversions (purine↔pyrimidine) are the underlying chemical changes." },
+
+  { id:"z4_m2", zone:4, difficulty:"medium", type:"matching",
+    prompt:"Match each DNA repair mechanism to a key feature that distinguishes it:",
+    pairs:[
+      { term:"Mismatch repair",           match:"Uses methylation status to distinguish the template strand from the newly synthesized strand" },
+      { term:"Nucleotide-excision repair", match:"Multi-enzyme complex excises a patch of 12–27 nucleotides containing the lesion" },
+      { term:"Photoreactivation",          match:"Requires visible light to activate photolyase; directly reverses UV-induced thymine dimers" },
+      { term:"Proofreading by DNA pol III",match:"3'→5' exonuclease activity immediately removes misincorporated nucleotides" },
+    ],
+    explanation:"Each repair pathway targets specific lesion types. Together, these mechanisms reduce the final error rate to approximately 10⁻¹⁰ per base pair per replication in E. coli." },
+
+  { id:"z4_m3", zone:4, difficulty:"medium", type:"ordering",
+    prompt:"Arrange the three stages of PROKARYOTIC TRANSCRIPTION in order and describe the key event:",
+    items:["Elongation: RNA polymerase moves along the template synthesizing mRNA in the 5'→3' direction","Termination: completed RNA is released and RNA polymerase dissociates","Initiation: RNA polymerase recognizes and binds to the −10 and −35 promoter sequences"],
+    correct_order:["Initiation: RNA polymerase recognizes and binds to the −10 and −35 promoter sequences","Elongation: RNA polymerase moves along the template synthesizing mRNA in the 5'→3' direction","Termination: completed RNA is released and RNA polymerase dissociates"],
+    explanation:"Unlike DNA polymerase, RNA polymerase does not require a primer. In prokaryotes (E. coli), the σ (sigma) factor enables the core enzyme to recognize the −10 and −35 promoter consensus sequences to initiate transcription." },
+
+  { id:"z4_m4", zone:4, difficulty:"medium", type:"matching",
+    prompt:"Match each gene regulatory element to its function:",
+    pairs:[
+      { term:"Enhancer",           match:"Cis-regulatory DNA sequence that increases transcription of a target gene; can act at a distance" },
+      { term:"Silencer",           match:"Cis-regulatory sequence that decreases transcription of a target gene" },
+      { term:"TATA box",           match:"Core promoter element ~30 bp upstream of transcription start; recruits general TFs and RNA pol II" },
+      { term:"Chromatin remodeling",match:"Alters nucleosome positioning (e.g., histone acetylation) to change DNA accessibility for transcription" },
+    ],
+    explanation:"Eukaryotic gene regulation is multilayered: chromatin structure gates access, the core promoter positions RNA pol II, and enhancers/silencers bound by specific transcription factors fine-tune expression levels." },
+
+  { id:"z4_m5", zone:4, difficulty:"medium", type:"ordering",
+    prompt:"Arrange the steps of eukaryotic TRANSLATION in the correct order:",
+    items:["Elongation: tRNAs bring amino acids to the ribosome; peptide bonds form","Termination: stop codon in A site is recognized by release factor; polypeptide released","Initiation: small ribosomal subunit scans mRNA for AUG start codon; large subunit joins"],
+    correct_order:["Initiation: small ribosomal subunit scans mRNA for AUG start codon; large subunit joins","Elongation: tRNAs bring amino acids to the ribosome; peptide bonds form","Termination: stop codon in A site is recognized by release factor; polypeptide released"],
+    explanation:"Translation at the ribosome involves three stages. The ribosome has three sites: A (aminoacyl), P (peptidyl), and E (exit). Elongation cycles aminoacyl-tRNAs through the A site, forms peptide bonds, and translocates the ribosome." },
+
+  { id:"z4_m6", zone:4, difficulty:"medium", type:"matching",
+    prompt:"Match each type of RNA to its role in gene expression:",
+    pairs:[
+      { term:"mRNA (messenger RNA)",   match:"Carries the coding information from DNA to the ribosome for translation" },
+      { term:"tRNA (transfer RNA)",    match:"Adapter molecule that carries a specific amino acid and recognizes a codon via its anticodon" },
+      { term:"rRNA (ribosomal RNA)",   match:"Structural and catalytic component of the ribosome (peptidyl transferase activity)" },
+      { term:"miRNA (microRNA)",       match:"Small non-coding RNA that guides RISC to silence complementary mRNA targets" },
+    ],
+    explanation:"RNA molecules play diverse roles beyond just carrying genetic information. rRNA in the large ribosomal subunit is a ribozyme — it catalyzes peptide bond formation. miRNAs are key post-transcriptional regulators of gene expression." },
+
+  { id:"z4_m7", zone:4, difficulty:"medium", type:"matching",
+    prompt:"Match each cancer genetics term to its definition:",
+    pairs:[
+      { term:"Proto-oncogene",    match:"Normal cellular gene involved in cell growth regulation; can become an oncogene when mutated or overexpressed" },
+      { term:"Oncogene",          match:"Mutated or overexpressed version of a proto-oncogene; gain-of-function mutation promotes uncontrolled cell growth" },
+      { term:"Tumor suppressor gene", match:"Gene whose normal function is to inhibit cell division or promote apoptosis; loss-of-function contributes to cancer" },
+      { term:"Two-hit hypothesis",match:"Knudson's model: both copies of a tumor suppressor must be inactivated for cancer to develop" },
+    ],
+    explanation:"Cancer results from accumulated mutations in genes controlling cell division. Oncogenes are dominant (one mutant allele suffices); tumor suppressors are recessive at the cellular level (both alleles must be inactivated per Knudson's two-hit hypothesis)." },
+
+  { id:"z4_m8", zone:4, difficulty:"medium", type:"ordering",
+    prompt:"Arrange the steps of the miRNA/siRNA gene-silencing pathway in the correct order:",
+    items:["RISC scans cytoplasm for complementary mRNA sequences","Pre-miRNA is exported from the nucleus to the cytoplasm","mRNA is degraded or translation is blocked","Dicer cleaves dsRNA/pre-miRNA into ~21-23 nt small RNAs","Single-stranded RNA guide strand is loaded into RISC complex"],
+    correct_order:["Pre-miRNA is exported from the nucleus to the cytoplasm","Dicer cleaves dsRNA/pre-miRNA into ~21-23 nt small RNAs","Single-stranded RNA guide strand is loaded into RISC complex","RISC scans cytoplasm for complementary mRNA sequences","mRNA is degraded or translation is blocked"],
+    explanation:"The RNAi pathway: dsRNA/pre-miRNA → Dicer cleavage → RISC loading (guide strand) → target mRNA silencing. This pathway is conserved across eukaryotes and provides an important defense against viruses and transposons." },
+
+  // — Hard —
+  { id:"z4_h1", zone:4, difficulty:"hard", type:"error_id",
+    prompt:"A student writes: \"A nonsense mutation is caused by the insertion of one or two nucleotides into the coding sequence, which creates a premature stop codon by shifting the reading frame.\"\n\nIdentify ALL errors in this statement:",
+    options:[
+      "The statement is correct",
+      "A nonsense mutation is a POINT SUBSTITUTION that directly creates a stop codon — it does NOT involve an insertion. The student described a frameshift mutation",
+      "Frameshifts never create stop codons",
+      "Stop codons cannot be created by single base substitutions"
+    ],
+    correct:"B",
+    explanation:"A nonsense mutation is a point mutation (single nucleotide substitution) that converts a sense codon to one of the three stop codons (UAA, UAG, UGA). A frameshift mutation (insertion/deletion) is a completely different type of mutation and can also generate downstream stop codons, but this is not called a nonsense mutation." },
+
+  { id:"z4_h2", zone:4, difficulty:"hard", type:"error_id",
+    prompt:"In a genetics lecture, the instructor states: \"The lac operon is repressed (turned off) when lactose is present in the growth medium.\"\n\nIs this correct?",
+    options:[
+      "Yes — lactose represses the lac operon",
+      "No — the lac operon is INDUCED (turned on) when lactose is present. Allolactose (a lactose derivative) binds the lac repressor and inactivates it, allowing transcription of the lacZ, lacY, and lacA genes",
+      "The lac operon is constitutively expressed and cannot be repressed",
+      "Lactose only affects the lac operon in eukaryotes"
+    ],
+    correct:"B",
+    explanation:"The lac operon encodes enzymes for lactose metabolism. When lactose is absent, the lac repressor (LacI product) binds the operator and blocks transcription. When lactose is present, allolactose binds and inactivates the repressor, inducing the operon. Absence of glucose (catabolite repression via cAMP-CAP) also contributes to full induction." },
+
+  { id:"z4_h3", zone:4, difficulty:"hard", type:"error_id",
+    prompt:"A student compares gene expression in prokaryotes and eukaryotes: \"In eukaryotes, as in prokaryotes, mRNA is translated by ribosomes as it is being transcribed — the two processes are coupled.\"\n\nWhat is the error?",
+    options:[
+      "The statement is correct — both systems couple transcription and translation",
+      "In EUKARYOTES, transcription and translation are uncoupled: transcription occurs in the nucleus (with mRNA processing: 5' cap, poly-A tail, intron splicing) and the mature mRNA is exported to the cytoplasm before translation begins",
+      "Prokaryotes do not couple transcription and translation",
+      "Eukaryotic mRNA is not processed before translation"
+    ],
+    correct:"B",
+    explanation:"In prokaryotes (no nucleus), transcription and translation can occur simultaneously. In eukaryotes, pre-mRNA is transcribed in the nucleus, processed (5' cap, poly-A tail, splicing of introns), and exported to the cytoplasm as mature mRNA before ribosomal translation begins." },
+
+  { id:"z4_h4", zone:4, difficulty:"hard", type:"punnett",
+    prompt:"Retinoblastoma (Rb) follows the two-hit hypothesis. A parent is heterozygous (Rb+/Rb−) for the tumor suppressor. Fill in the Punnett square for this parent crossed with a wild-type (Rb+/Rb+) individual.",
+    cross:"Rb+/Rb− × Rb+/Rb+",
+    row_gametes:["Rb+","Rb−"],
+    col_gametes:["Rb+","Rb+"],
+    correct_cells:["Rb+/Rb+","Rb+/Rb+","Rb+/Rb−","Rb+/Rb−"],
+    cell_options:["Rb+/Rb+","Rb+/Rb−","Rb−/Rb−","Rb−/Rb+"],
+    ratio_prompt:"What proportion of offspring inherit the heterozygous Rb+/Rb− genotype (and would require a somatic 'second hit' for cancer to develop)?",
+    ratio_options:["0% (none)","25%","50%","100%"],
+    ratio_correct:"C",
+    explanation:"The cross Rb+/Rb− × Rb+/Rb+ yields 50% Rb+/Rb+ (wild-type) and 50% Rb+/Rb− (carriers with elevated cancer risk). Carriers have one functional and one defective Rb allele — cancer develops if a somatic mutation inactivates the remaining wild-type allele (the second hit)." },
+
+  { id:"z4_h5", zone:4, difficulty:"hard", type:"error_id",
+    prompt:"A student classifies a mutation: \"A change from CGA (arginine) to CGG (arginine) is a missense mutation because a nucleotide was substituted.\"\n\nWhat is the error?",
+    options:[
+      "The mutation is a nonsense mutation",
+      "This is a SILENT (synonymous) mutation, not a missense mutation — both CGA and CGG encode arginine, so the amino acid sequence is unchanged",
+      "CGA and CGG encode different amino acids",
+      "The statement is correct — any nucleotide substitution is a missense mutation"
+    ],
+    correct:"B",
+    explanation:"CGA and CGG both encode arginine (due to the degeneracy of the genetic code). Because the amino acid sequence is unchanged, this is a silent (synonymous) mutation. A missense mutation results in a DIFFERENT amino acid being incorporated." },
+
+  { id:"z4_h6", zone:4, difficulty:"hard", type:"error_id",
+    prompt:"A student studying DNA repair states: \"Transitions are purine-to-pyrimidine base substitutions (e.g., A→C), while transversions are purine-to-purine or pyrimidine-to-pyrimidine substitutions (e.g., A→G).\"\n\nWhat is wrong?",
+    options:[
+      "The statement is correct",
+      "The definitions are REVERSED: transitions are purine→purine or pyrimidine→pyrimidine (same class, e.g., A↔G or C↔T); transversions are purine↔pyrimidine (different class, e.g., A↔C)",
+      "Transitions and transversions are the same thing",
+      "Purines can only pair with purines in DNA"
+    ],
+    correct:"B",
+    explanation:"Transitions: same base class (purine→purine: A↔G; pyrimidine→pyrimidine: C↔T). Transversions: different base class (purine↔pyrimidine: A↔C, A↔T, G↔C, G↔T). Transitions are more common because they involve structurally similar bases." },
+
+  // ══════════════════════════════════════════════════════════
+  // ZONE 5 — EVOLUTION & POPULATION GENETICS  (10 easy, 8 medium, 6 hard)
+  // ══════════════════════════════════════════════════════════
+
+  // — Easy —
+  { id:"z5_e1", zone:5, difficulty:"easy", type:"multiple_choice",
+    prompt:"In the Hardy-Weinberg equation p² + 2pq + q² = 1, what do the three terms represent?",
+    options:["p² = frequency of dominant allele; 2pq = frequency of heterozygotes; q² = frequency of recessive allele","p² = frequency of AA genotype; 2pq = frequency of Aa genotype; q² = frequency of aa genotype","p = dominant allele; q = recessive allele; pq = gene frequency","p² = phenotype frequency; 2pq = genotype frequency; q² = allele frequency"],
+    correct:"B",
+    explanation:"In a Hardy-Weinberg population, genotype frequencies are: AA = p², Aa = 2pq, aa = q², where p and q are the frequencies of the two alleles (p + q = 1). These frequencies remain constant across generations under HWE." },
+
+  { id:"z5_e2", zone:5, difficulty:"easy", type:"true_false",
+    prompt:"In a population at Hardy-Weinberg equilibrium, allele frequencies change from generation to generation due to random mating.",
+    correct:"False",
+    explanation:"The Hardy-Weinberg principle states that allele and genotype frequencies remain CONSTANT from generation to generation in the absence of evolution (no mutation, migration, drift, or selection, with random mating). Random mating shuffles genotypes but does not change allele frequencies." },
+
+  { id:"z5_e3", zone:5, difficulty:"easy", type:"multiple_choice",
+    prompt:"The founder effect occurs when:",
+    options:["A population undergoes a sudden sharp reduction in size due to a catastrophic event","A small number of individuals from a larger population establish a new, isolated population","Inbreeding increases the frequency of homozygotes in a population","Natural selection removes deleterious alleles from the gene pool"],
+    correct:"B",
+    explanation:"The founder effect is a form of genetic drift in which a small number of 'founding' individuals establish a new population. Their allele frequencies may differ considerably from the original population, reducing genetic diversity." },
+
+  { id:"z5_e4", zone:5, difficulty:"easy", type:"multiple_choice",
+    prompt:"Which of the following is NOT an assumption of Hardy-Weinberg equilibrium?",
+    options:["No natural selection","Random mating","Large population size","Frequent mutation at each locus"],
+    correct:"D",
+    explanation:"HWE assumes no mutation, no migration, no genetic drift (large population), no selection, and random mating. Mutation violates HWE and is listed as an assumption of ABSENCE — it is not permitted under the HWE null model." },
+
+  { id:"z5_e5", zone:5, difficulty:"easy", type:"true_false",
+    prompt:"Directional natural selection consistently favors one phenotypic extreme over the other, shifting the population mean over generations.",
+    correct:"True",
+    explanation:"Directional selection favors individuals at one extreme of the phenotypic distribution (e.g., larger body size). Over generations, the population mean shifts toward that extreme as favored alleles increase in frequency." },
+
+  { id:"z5_e6", zone:5, difficulty:"easy", type:"multiple_choice",
+    prompt:"In population genetics, a genotype with relative fitness W = 1 is:",
+    options:["Completely lethal","The most fit genotype in the population (the reference standard)","Neutral — it neither increases nor decreases in frequency","Eliminated by natural selection"],
+    correct:"B",
+    explanation:"By convention, the most fit genotype is assigned W = 1 (or absolute fitness normalized to 1). All other genotypes are scaled relative to this standard. A genotype with W < 1 has reduced fitness (selection coefficient s = 1 − W > 0)." },
+
+  { id:"z5_e7", zone:5, difficulty:"easy", type:"true_false",
+    prompt:"The neutral theory of molecular evolution proposes that most molecular (DNA and protein) variation within and between species is selectively neutral.",
+    correct:"True",
+    explanation:"Neutral theory (Kimura, 1968) proposes that the majority of molecular variants are selectively neutral and their frequencies change via genetic drift, not natural selection. This theory underlies the concept of the molecular clock." },
+
+  { id:"z5_e8", zone:5, difficulty:"easy", type:"multiple_choice",
+    prompt:"Which mode of natural selection favors individuals with INTERMEDIATE phenotypic values and reduces variation in the population?",
+    options:["Directional selection","Disruptive selection","Stabilizing selection","Frequency-dependent selection"],
+    correct:"C",
+    explanation:"Stabilizing selection acts against both extremes, favoring the intermediate phenotype. It maintains the population mean but reduces phenotypic variance. Human birth weight is a classic example." },
+
+  { id:"z5_e9", zone:5, difficulty:"easy", type:"multiple_choice",
+    prompt:"The inbreeding coefficient F measures:",
+    options:["The degree of genetic relatedness between parents","The probability that an individual is autozygous (both alleles at a locus are identical by descent)","The rate at which allele frequencies change per generation","The selection coefficient against inbred offspring"],
+    correct:"B",
+    explanation:"The inbreeding coefficient F is the probability that both alleles at a locus in an individual are identical by descent (IBD) — inherited from the same ancestral copy. Inbreeding increases homozygosity and decreases heterozygosity in the population." },
+
+  { id:"z5_e10", zone:5, difficulty:"easy", type:"true_false",
+    prompt:"Gene flow (migration) between two isolated populations tends to HOMOGENIZE allele frequencies between them.",
+    correct:"True",
+    explanation:"Gene flow introduces alleles from one population to another. If populations have different allele frequencies, migration averages them out — reducing genetic differentiation (FST) between populations and homogenizing allele frequencies over time." },
+
+  // — Medium —
+  { id:"z5_m1", zone:5, difficulty:"medium", type:"matching",
+    prompt:"Match each mode of natural selection to its description:",
+    pairs:[
+      { term:"Directional selection",  match:"Consistently favors one phenotypic extreme; shifts population mean over generations" },
+      { term:"Stabilizing selection",  match:"Favors intermediate phenotypes; reduces variance while maintaining the mean" },
+      { term:"Disruptive selection",   match:"Favors both extremes over the intermediate; can lead to bimodal distributions or speciation" },
+      { term:"Balancing selection",    match:"Maintains two or more alleles at high frequency (e.g., overdominance/heterozygote advantage)" },
+    ],
+    explanation:"Different selection regimes have different effects on the shape of the phenotypic distribution. Sickle-cell anemia is a classic case of balancing selection (heterozygote advantage) in malaria-endemic regions." },
+
+  { id:"z5_m2", zone:5, difficulty:"medium", type:"matching",
+    prompt:"Match each evolutionary force to its primary effect on allele frequencies:",
+    pairs:[
+      { term:"Mutation",        match:"Introduces new alleles into the gene pool; rate is very low per locus per generation" },
+      { term:"Genetic drift",   match:"Random changes in allele frequency due to chance; strongest in small populations" },
+      { term:"Natural selection",match:"Deterministic change in allele frequency based on differential reproductive fitness" },
+      { term:"Gene flow",       match:"Transfer of alleles between populations via migration; homogenizes allele frequencies" },
+    ],
+    explanation:"These four forces drive evolutionary change in allele frequencies. Hardy-Weinberg equilibrium is the null model predicting NONE of these forces act. Detecting deviations from HWE indicates one or more forces at work." },
+
+  { id:"z5_m3", zone:5, difficulty:"medium", type:"ordering",
+    prompt:"Arrange the steps for calculating EXPECTED GENOTYPE FREQUENCIES using Hardy-Weinberg equilibrium:",
+    items:["Calculate 2pq for heterozygote frequency","Verify p + q = 1","Count alleles to determine allele frequencies p and q","Calculate p² for dominant homozygote and q² for recessive homozygote","Compare observed genotype frequencies to HWE expectations using chi-square test"],
+    correct_order:["Count alleles to determine allele frequencies p and q","Verify p + q = 1","Calculate p² for dominant homozygote and q² for recessive homozygote","Calculate 2pq for heterozygote frequency","Compare observed genotype frequencies to HWE expectations using chi-square test"],
+    explanation:"To test HWE: first estimate allele frequencies from the data (usually from the phenotypic frequency of recessive homozygotes, q² = frequency of aa). Then calculate expected genotype frequencies and compare to observed using chi-square (1 df because p was estimated from the data)." },
+
+  { id:"z5_m4", zone:5, difficulty:"medium", type:"matching",
+    prompt:"Match each population genetics event to its consequence for genetic diversity:",
+    pairs:[
+      { term:"Population bottleneck",  match:"Sharp reduction in population size reduces genetic diversity; allele frequencies change randomly" },
+      { term:"Founder effect",         match:"Small founding group creates a new population with reduced diversity and potentially non-representative allele frequencies" },
+      { term:"Inbreeding",             match:"Mating between related individuals increases homozygosity and can expose deleterious recessive alleles" },
+      { term:"Gene flow",              match:"Migration between populations introduces new alleles and increases genetic diversity in the recipient population" },
+    ],
+    explanation:"Bottlenecks and founder effects are special cases of genetic drift that occurred historically in many species. The cheetah population famously has very low genetic diversity, likely due to a bottleneck ~10,000 years ago." },
+
+  { id:"z5_m5", zone:5, difficulty:"medium", type:"ordering",
+    prompt:"Arrange the key logical steps of PHYLOGENETIC INFERENCE from molecular sequence data in the correct order:",
+    items:["Identify a molecular clock to estimate divergence times","Collect homologous DNA or protein sequences from species to compare","Evaluate and select the best-supported tree topology","Build a multiple sequence alignment","Calculate distances or likelihood scores to infer the tree"],
+    correct_order:["Collect homologous DNA or protein sequences from species to compare","Build a multiple sequence alignment","Calculate distances or likelihood scores to infer the tree","Evaluate and select the best-supported tree topology","Identify a molecular clock to estimate divergence times"],
+    explanation:"Phylogenetic inference uses molecular data (DNA sequences, protein sequences) to reconstruct evolutionary relationships. The molecular clock relies on neutral theory: synonymous substitutions accumulate at a relatively constant rate over time." },
+
+  { id:"z5_m6", zone:5, difficulty:"medium", type:"matching",
+    prompt:"Match each molecular evolution term to its definition:",
+    pairs:[
+      { term:"Neutral theory",         match:"Most molecular variation is selectively neutral; frequency changes driven by drift not selection" },
+      { term:"Molecular clock",        match:"Neutral substitutions accumulate at a roughly constant rate over time, allowing estimation of divergence dates" },
+      { term:"Synonymous substitution",match:"Nucleotide change that does not alter the encoded amino acid; usually selectively neutral" },
+      { term:"Non-synonymous substitution", match:"Nucleotide change that alters the amino acid sequence; may be subject to positive or purifying selection" },
+    ],
+    explanation:"The ratio of non-synonymous to synonymous substitutions (dN/dS or Ka/Ks) is used to detect positive selection (dN/dS > 1), neutral evolution (dN/dS ≈ 1), or purifying selection (dN/dS < 1) on protein-coding genes." },
+
+  { id:"z5_m7", zone:5, difficulty:"medium", type:"matching",
+    prompt:"Match each selection type to its effect on relative fitness (W) of genotypes AA, Aa, and aa:",
+    pairs:[
+      { term:"Directional selection against aa",   match:"W: AA=1, Aa=1, aa = 1−s (s > 0)" },
+      { term:"Heterozygote advantage (overdominance)", match:"W: AA < 1, Aa = 1 (highest), aa < 1" },
+      { term:"Purifying selection on aa",           match:"W: AA=1, Aa=1, aa = 0 (lethal recessive)" },
+      { term:"Neutral evolution",                   match:"W: AA=1, Aa=1, aa=1 (all equal)" },
+    ],
+    explanation:"Fitness values (W) determine how selection changes allele frequencies. With directional selection against aa, the frequency of a decreases each generation. Heterozygote advantage (e.g., sickle cell) maintains both alleles at stable intermediate frequencies." },
+
+  { id:"z5_m8", zone:5, difficulty:"medium", type:"ordering",
+    prompt:"Arrange the consequences of INBREEDING on a population's genotype frequencies in logical order:",
+    items:["Inbreeding coefficient F increases in the population","Heterozygosity decreases by a factor of (1 − F) each generation","Deleterious recessive alleles are expressed in homozygotes (inbreeding depression)","Related individuals mate more often than expected by chance","Homozygosity at all loci increases"],
+    correct_order:["Related individuals mate more often than expected by chance","Inbreeding coefficient F increases in the population","Homozygosity at all loci increases","Heterozygosity decreases by a factor of (1 − F) each generation","Deleterious recessive alleles are expressed in homozygotes (inbreeding depression)"],
+    explanation:"Inbreeding does not change allele frequencies by itself — it only rearranges them into more homozygous genotypes. The expected heterozygosity under inbreeding is 2pq(1 − F), compared to the HWE expectation of 2pq." },
+
+  // — Hard —
+  { id:"z5_h1", zone:5, difficulty:"hard", type:"punnett",
+    prompt:"A population has allele frequencies p (A) = 0.6 and q (a) = 0.4. Calculate the expected Hardy-Weinberg genotype frequencies. Fill in the frequency for each genotype class.",
+    cross:"p = 0.6, q = 0.4 (allele frequencies in HWE population)",
+    row_gametes:["A (freq = 0.6)","a (freq = 0.4)"],
+    col_gametes:["A (0.6)","a (0.4)"],
+    correct_cells:["AA = 0.36","Aa = 0.24","aA = 0.24","aa = 0.16"],
+    cell_options:["AA = 0.36","Aa = 0.24","aA = 0.24","aa = 0.16","AA = 0.60","aa = 0.40","Aa = 0.48","aa = 0.04"],
+    ratio_prompt:"What is the total expected frequency of HETEROZYGOTES (Aa) in this HWE population?",
+    ratio_options:["0.24","0.48 (sum of Aa + aA)","0.36","0.16"],
+    ratio_correct:"B",
+    explanation:"HWE genotype frequencies: AA = p² = 0.36, Aa = 2pq = 2(0.6)(0.4) = 0.48, aa = q² = 0.16. Total = 1.0. The heterozygote class (2pq = 0.48) is the most frequent genotype when p and q are both between 1/3 and 2/3." },
+
+  { id:"z5_h2", zone:5, difficulty:"hard", type:"error_id",
+    prompt:"A student writes: \"Natural selection only changes PHENOTYPE frequencies; it does not change ALLELE frequencies over generations.\"\n\nWhat is the error?",
+    options:[
+      "The statement is correct — natural selection acts on phenotypes but not alleles",
+      "Natural selection acts on phenotypes but changes ALLELE frequencies: individuals with higher fitness survive and reproduce more, passing their alleles to the next generation at higher rates — this is how allele frequencies evolve",
+      "Natural selection acts directly on DNA sequences, not phenotypes",
+      "Allele frequencies change only via genetic drift, not selection"
+    ],
+    correct:"B",
+    explanation:"Natural selection acts on phenotypes, but because phenotypes are influenced by genotypes, selection differentially changes the reproductive success of different genotypes. This directly alters allele frequencies across generations — the core mechanism of adaptive evolution." },
+
+  { id:"z5_h3", zone:5, difficulty:"hard", type:"error_id",
+    prompt:"A student studying inbreeding concludes: \"Populations with high inbreeding coefficients (F ≈ 0.3) should show a significant EXCESS of heterozygotes compared to Hardy-Weinberg expectations.\"\n\nIdentify the error:",
+    options:[
+      "The student is correct — inbreeding increases heterozygosity",
+      "Inbreeding produces an EXCESS of HOMOZYGOTES (and deficit of heterozygotes) compared to HWE. Expected heterozygosity under inbreeding = 2pq(1 − F), which is less than the HWE expectation of 2pq",
+      "Inbreeding has no effect on genotype frequencies",
+      "Only extreme inbreeding (F = 1.0) changes genotype frequencies"
+    ],
+    correct:"B",
+    explanation:"Inbreeding increases the probability that both alleles in an individual are identical by descent (IBD), which means more homozygotes and fewer heterozygotes. Observed heterozygosity = 2pq(1−F) < 2pq (HWE). The opposite pattern — excess heterozygotes — can suggest outbreeding, selection for heterozygotes, or population admixture." },
+
+  { id:"z5_h4", zone:5, difficulty:"hard", type:"error_id",
+    prompt:"A student reads: \"The founder effect, like the bottleneck effect, is a form of genetic drift that INCREASES genetic diversity in the newly founded population because founders bring new alleles to a previously empty environment.\"\n\nWhat is the error?",
+    options:[
+      "The statement is correct",
+      "The founder effect DECREASES genetic diversity in the newly founded population. Founders represent only a small subset of the original population's allelic diversity; alleles rare in the original population may be absent, and random sampling creates a non-representative gene pool",
+      "The founder effect only affects allele frequencies, not genetic diversity",
+      "Founder effects only occur in plants, not animals"
+    ],
+    correct:"B",
+    explanation:"The founder effect reduces genetic diversity because a small founding group cannot carry all the alleles present in the source population. Rare alleles are likely lost by chance (genetic drift). The resulting population has lower heterozygosity and allelic richness than the original." },
+
+  { id:"z5_h5", zone:5, difficulty:"hard", type:"punnett",
+    prompt:"In a population, allele A has frequency p = 0.8, allele a has frequency q = 0.2. A bottleneck reduces the population to just 5 individuals who happen to have the following genotypes: AA, AA, Aa, aa, AA.\n\nCount the alleles after the bottleneck.",
+    cross:"Post-bottleneck: 5 individuals (AA, AA, Aa, aa, AA)",
+    row_gametes:["Count A alleles","Count a alleles"],
+    col_gametes:["From genotypes"],
+    correct_cells:["7 (A alleles)","3 (a alleles)"],
+    cell_options:["5","6","7","3","2","4","8"],
+    ratio_prompt:"What is the new frequency of allele a in the post-bottleneck population?",
+    ratio_options:["q = 0.20 (unchanged)","q = 0.30","q = 0.40","q = 0.10"],
+    ratio_correct:"B",
+    explanation:"Post-bottleneck alleles: 5 individuals × 2 alleles = 10 total. A alleles: 2+2+1+0+2 = 7. a alleles: 0+0+1+2+0 = 3. New q = 3/10 = 0.30. The bottleneck changed q from 0.2 to 0.3 by random sampling — this is genetic drift in action." },
+
+  { id:"z5_h6", zone:5, difficulty:"hard", type:"error_id",
+    prompt:"A student writes: \"Sustained gene flow between two genetically divergent populations will INCREASE the genetic differentiation (FST) between them over time, as each population retains its unique alleles.\"\n\nWhat is the error?",
+    options:[
+      "The statement is correct — gene flow increases differentiation",
+      "Gene flow DECREASES genetic differentiation (FST). Migration introduces alleles from each population into the other, homogenizing allele frequencies and reducing FST. High gene flow counteracts the diverging effects of drift and local selection",
+      "Gene flow has no effect on FST",
+      "FST is only affected by mutation rates, not gene flow"
+    ],
+    correct:"B",
+    explanation:"FST measures the degree of allele-frequency differentiation between populations. Gene flow reduces FST by transferring alleles between populations and equalizing their frequencies. In contrast, genetic drift and local adaptation increase FST by causing populations to diverge. The balance between drift and migration determines the equilibrium FST." },
+];
+
+// ── Utility helpers ──────────────────────────────────────────
+const getZone = (id) => ZONES[id - 1];
+const byZoneAndDifficulty = (zone, diff) =>
+  QUESTIONS.filter(q => q.zone === zone && q.difficulty === diff);
+const randomQuestion = (zone, diff, usedIds) => {
+  const pool = byZoneAndDifficulty(zone, diff).filter(q => !usedIds.has(q.id));
+  if (!pool.length) return byZoneAndDifficulty(zone, diff)[Math.floor(Math.random() * byZoneAndDifficulty(zone, diff).length)];
+  return pool[Math.floor(Math.random() * pool.length)];
+};
+
+// ── Sub-components: Question types ──────────────────────────
+
+function MCQuestion({ question, onAnswer }) {
+  const [selected, setSelected] = useState(null);
+  const opts = ["A","B","C","D"];
+  return (
+    <div className="space-y-3">
+      {question.options.map((opt, i) => {
+        const letter = opts[i];
+        const isSelected = selected === letter;
+        return (
+          <button key={i} onClick={() => { if (!selected) { setSelected(letter); onAnswer(letter === question.correct); }}}
+            className={`w-full text-left p-3 rounded-xl border-2 text-sm transition-all ${
+              !selected ? "border-gray-200 bg-white hover:border-blue-300 hover:bg-blue-50 active:scale-95"
+              : isSelected && letter === question.correct ? "border-green-400 bg-green-50 text-green-800"
+              : isSelected ? "border-red-400 bg-red-50 text-red-800"
+              : letter === question.correct && selected ? "border-green-400 bg-green-50 text-green-800"
+              : "border-gray-200 bg-gray-50 text-gray-400"}`}>
+            <span className="font-bold mr-2">{letter}.</span>{opt}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function TFQuestion({ question, onAnswer }) {
+  const [selected, setSelected] = useState(null);
+  return (
+    <div className="flex gap-4">
+      {["True","False"].map(tf => {
+        const correct = question.correct === tf;
+        const isSelected = selected === tf;
+        return (
+          <button key={tf} onClick={() => { if (!selected) { setSelected(tf); onAnswer(correct); }}}
+            className={`flex-1 py-4 rounded-xl border-2 font-bold text-lg transition-all ${
+              !selected ? "border-gray-200 bg-white hover:bg-blue-50 hover:border-blue-300 active:scale-95"
+              : isSelected && correct ? "border-green-400 bg-green-100 text-green-800"
+              : isSelected ? "border-red-400 bg-red-100 text-red-800"
+              : correct && selected ? "border-green-400 bg-green-100 text-green-800"
+              : "border-gray-200 bg-gray-50 text-gray-400"}`}>
+            {tf === "True" ? "✓ True" : "✗ False"}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function MatchingQuestion({ question, onAnswer }) {
+  const [selectedTerm, setSelectedTerm] = useState(null);
+  const [pairs, setPairs] = useState({});
+  const [shuffledMatches] = useState(() => shuffle(question.pairs.map(p => p.match)));
+  const [wrong, setWrong] = useState(null);
+  const [done, setDone] = useState(false);
+
+  const handleTerm = (term) => { if (pairs[term] || done) return; setSelectedTerm(selectedTerm === term ? null : term); };
+  const handleMatch = (match) => {
+    if (!selectedTerm || done) return;
+    const correct = question.pairs.find(p => p.term === selectedTerm).match === match;
+    if (correct) {
+      const newPairs = { ...pairs, [selectedTerm]: match };
+      setPairs(newPairs);
+      setSelectedTerm(null);
+      if (Object.keys(newPairs).length === question.pairs.length) {
+        setDone(true); setTimeout(() => onAnswer(true), 700);
+      }
+    } else {
+      setWrong(match); setTimeout(() => setWrong(null), 600);
+    }
+  };
+
+  const matchedValues = new Set(Object.values(pairs));
+  return (
+    <div className="flex gap-3">
+      <div className="flex-1 space-y-2">
+        <p className="text-xs font-bold text-gray-500 mb-2">TERMS</p>
+        {question.pairs.map((p,i) => (
+          <button key={i} onClick={() => handleTerm(p.term)}
+            className={`w-full text-left p-2.5 rounded-lg border-2 text-xs transition-all ${
+              pairs[p.term] ? "border-green-400 bg-green-50 text-green-800"
+              : selectedTerm === p.term ? "border-blue-500 bg-blue-50"
+              : "border-gray-200 bg-white hover:border-blue-300"}`}>
+            {p.term}
+          </button>
+        ))}
+      </div>
+      <div className="flex-1 space-y-2">
+        <p className="text-xs font-bold text-gray-500 mb-2">DEFINITIONS</p>
+        {shuffledMatches.map((m,i) => (
+          <button key={i} onClick={() => handleMatch(m)}
+            className={`w-full text-left p-2.5 rounded-lg border-2 text-xs transition-all ${
+              matchedValues.has(m) ? "border-green-400 bg-green-50 text-green-800"
+              : wrong === m ? "border-red-400 bg-red-50 animate-pulse"
+              : selectedTerm ? "border-blue-200 bg-blue-50 hover:border-blue-400 hover:bg-blue-100"
+              : "border-gray-200 bg-white"}`}>
+            {m}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function OrderingQuestion({ question, onAnswer }) {
+  const [available, setAvailable] = useState(() => shuffle(question.items));
+  const [sequence, setSequence] = useState([]);
+  const [result, setResult] = useState(null);
+
+  const addToSeq = (item) => {
+    setAvailable(a => a.filter(x => x !== item));
+    setSequence(s => [...s, item]);
+  };
+  const removeFromSeq = (item) => {
+    setSequence(s => s.filter(x => x !== item));
+    setAvailable(a => [...a, item]);
+  };
+  const checkOrder = () => {
+    const correct = sequence.every((item, i) => item === question.correct_order[i]) && sequence.length === question.correct_order.length;
+    setResult(correct ? "correct" : "wrong");
+    if (correct) setTimeout(() => onAnswer(true), 700);
+    else setTimeout(() => { setResult(null); setAvailable(shuffle(question.items)); setSequence([]); }, 1200);
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="min-h-16 bg-gray-50 border-2 border-dashed border-gray-300 rounded-xl p-2">
+        <p className="text-xs text-gray-400 mb-1">Your order (tap to remove):</p>
+        <div className="space-y-1">
+          {sequence.map((item, i) => (
+            <div key={i} onClick={() => { if (!result) removeFromSeq(item); }}
+              className={`flex items-center gap-2 p-2 rounded-lg text-xs cursor-pointer transition-all ${
+                result === "correct" ? "bg-green-100 border border-green-400 text-green-800"
+                : result === "wrong" ? "bg-red-100 border border-red-400 text-red-800"
+                : "bg-blue-50 border border-blue-300 hover:bg-blue-100"}`}>
+              <span className="font-bold text-gray-500 w-4">{i+1}.</span>{item}
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="space-y-1">
+        <p className="text-xs text-gray-400">Available (tap to add):</p>
+        {available.map((item, i) => (
+          <button key={i} onClick={() => addToSeq(item)}
+            className="w-full text-left p-2 rounded-lg text-xs bg-white border-2 border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-all">
+            {item}
+          </button>
+        ))}
+      </div>
+      {sequence.length === question.items.length && !result && (
+        <button onClick={checkOrder} className="w-full py-3 bg-blue-600 text-white rounded-xl font-bold text-sm hover:bg-blue-700 transition-all">
+          ✓ Check Order
+        </button>
+      )}
+      {result === "wrong" && <p className="text-center text-red-600 text-sm font-bold animate-bounce">Not quite — try again!</p>}
+    </div>
+  );
+}
+
+function PunnettQuestion({ question, onAnswer }) {
+  const [cells, setCells] = useState(["","","",""]);
+  const [showRatio, setShowRatio] = useState(false);
+  const [punnettDone, setPunnettDone] = useState(false);
+  const [selectedRatio, setSelectedRatio] = useState(null);
+  const [activeCell, setActiveCell] = useState(null);
+
+  const cellPositions = [
+    {r:0,c:0}, {r:0,c:1}, {r:1,c:0}, {r:1,c:1}
+  ];
+
+  const pickOption = (opt) => {
+    if (activeCell === null) return;
+    const newCells = [...cells];
+    newCells[activeCell] = opt;
+    setCells(newCells);
+    setActiveCell(null);
+  };
+
+  const checkPunnett = () => {
+    const allCorrect = cells.every((c, i) => {
+      const expected = question.correct_cells[i];
+      return c === expected || c === expected.split("").reverse().join("");
+    });
+    if (allCorrect) { setPunnettDone(true); setTimeout(() => setShowRatio(true), 500); }
+    else { setCells(["","","",""]); setActiveCell(null); }
+  };
+
+  const checkRatio = (letter) => {
+    setSelectedRatio(letter);
+    setTimeout(() => onAnswer(letter === question.ratio_correct), 700);
+  };
+
+  const opts = ["A","B","C","D"];
+  const allFilled = cells.every(c => c !== "");
+
+  if (!question.row_gametes || question.row_gametes.length > 2) {
+    return (
+      <div className="space-y-2">
+        <p className="text-sm font-medium text-gray-700">{question.ratio_prompt}</p>
+        {question.ratio_options.map((opt, i) => (
+          <button key={i} onClick={() => checkRatio(opts[i])}
+            className={`w-full text-left p-3 rounded-xl border-2 text-sm transition-all ${
+              !selectedRatio ? "border-gray-200 bg-white hover:border-blue-300 hover:bg-blue-50"
+              : selectedRatio === opts[i] && opts[i] === question.ratio_correct ? "border-green-400 bg-green-50"
+              : selectedRatio === opts[i] ? "border-red-400 bg-red-50"
+              : opts[i] === question.ratio_correct && selectedRatio ? "border-green-400 bg-green-50"
+              : "border-gray-200 bg-gray-50 text-gray-400"}`}>
+            <span className="font-bold mr-2">{opts[i]}.</span>{opt}
+          </button>
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <p className="text-xs text-gray-500">Cross: <span className="font-bold text-gray-700">{question.cross}</span></p>
+      {!showRatio ? (
+        <>
+          <div className="overflow-x-auto">
+            <table className="mx-auto border-collapse text-xs font-mono">
+              <thead>
+                <tr>
+                  <th className="w-12 h-10"></th>
+                  {question.col_gametes.map((g,i) => (
+                    <th key={i} className="w-16 h-10 text-center font-bold text-blue-700 border border-gray-300 bg-blue-50 px-2">{g}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {question.row_gametes.map((rg, ri) => (
+                  <tr key={ri}>
+                    <td className="font-bold text-blue-700 border border-gray-300 bg-blue-50 text-center px-2 h-16">{rg}</td>
+                    {question.col_gametes.map((cg, ci) => {
+                      const idx = ri * question.col_gametes.length + ci;
+                      const isActive = activeCell === idx;
+                      const isDone = punnettDone && cells[idx];
+                      return (
+                        <td key={ci} onClick={() => { if (!punnettDone) setActiveCell(isActive ? null : idx); }}
+                          className={`w-16 h-16 text-center border-2 cursor-pointer transition-all ${
+                            isDone ? "border-green-400 bg-green-50 text-green-800"
+                            : isActive ? "border-blue-500 bg-blue-100"
+                            : cells[idx] ? "border-gray-300 bg-gray-50"
+                            : "border-dashed border-gray-300 hover:border-blue-300 hover:bg-blue-50"}`}>
+                          <span className={`font-bold ${cells[idx] ? "text-sm" : "text-gray-300 text-xl"}`}>
+                            {cells[idx] || "?"}
+                          </span>
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {activeCell !== null && (
+            <div className="bg-blue-50 rounded-xl p-3 border border-blue-200">
+              <p className="text-xs text-blue-600 mb-2 font-medium">Select genotype for this cell:</p>
+              <div className="grid grid-cols-2 gap-2">
+                {question.cell_options.map((opt, i) => (
+                  <button key={i} onClick={() => pickOption(opt)}
+                    className="py-2 px-3 bg-white border-2 border-blue-200 rounded-lg text-sm font-mono hover:bg-blue-100 hover:border-blue-400 transition-all">
+                    {opt}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          {allFilled && !punnettDone && (
+            <button onClick={checkPunnett} className="w-full py-3 bg-blue-600 text-white rounded-xl font-bold text-sm hover:bg-blue-700 transition-all">
+              ✓ Check Punnett Square
+            </button>
+          )}
+          {!allFilled && <p className="text-center text-xs text-gray-400">Tap each cell (?) to fill it in</p>}
+        </>
+      ) : (
+        <div className="space-y-3">
+          <div className="p-3 bg-green-50 border border-green-300 rounded-xl text-sm text-green-700 font-medium text-center">
+            ✅ Punnett square correct! Now answer:
+          </div>
+          <p className="text-sm font-medium text-gray-700">{question.ratio_prompt}</p>
+          {question.ratio_options.map((opt, i) => (
+            <button key={i} onClick={() => checkRatio(opts[i])}
+              className={`w-full text-left p-3 rounded-xl border-2 text-sm transition-all ${
+                !selectedRatio ? "border-gray-200 bg-white hover:border-blue-300 hover:bg-blue-50"
+                : selectedRatio === opts[i] && opts[i] === question.ratio_correct ? "border-green-400 bg-green-50"
+                : selectedRatio === opts[i] ? "border-red-400 bg-red-50"
+                : opts[i] === question.ratio_correct && selectedRatio ? "border-green-400 bg-green-50"
+                : "border-gray-200 bg-gray-50 text-gray-400"}`}>
+              <span className="font-bold mr-2">{opts[i]}.</span>{opt}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ErrorIDQuestion({ question, onAnswer }) {
+  return <MCQuestion question={question} onAnswer={onAnswer} />;
+}
+
+function QuestionDisplay({ question, onAnswer, onSkip }) {
+  const [answered, setAnswered] = useState(null);
+  const handleAnswer = (isCorrect) => {
+    setAnswered(isCorrect);
+    setTimeout(() => onAnswer(isCorrect), isCorrect ? 1500 : 2000);
+  };
+  const zone = getZone(question.zone);
+  const diffColor = question.difficulty === "easy" ? "text-green-600 bg-green-100" 
+    : question.difficulty === "medium" ? "text-orange-600 bg-orange-100" : "text-red-600 bg-red-100";
+  const typeLabel = { multiple_choice:"Multiple Choice", true_false:"True / False", matching:"Matching", ordering:"Sequence", punnett:"Punnett Builder", error_id:"Find the Error" };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className={`px-2 py-1 rounded-full text-xs font-bold ${zone.header} text-white`}>{zone.emoji} {zone.short}</span>
+        <span className={`px-2 py-1 rounded-full text-xs font-bold ${diffColor}`}>{question.difficulty.charAt(0).toUpperCase()+question.difficulty.slice(1)}</span>
+        <span className="px-2 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-600">{typeLabel[question.type]}</span>
+      </div>
+      <p className="text-sm font-medium leading-relaxed whitespace-pre-line">{question.prompt}</p>
+      <div>
+        {question.type === "multiple_choice" && <MCQuestion question={question} onAnswer={handleAnswer} key={question.id} />}
+        {question.type === "true_false" && <TFQuestion question={question} onAnswer={handleAnswer} key={question.id} />}
+        {question.type === "matching" && <MatchingQuestion question={question} onAnswer={handleAnswer} key={question.id} />}
+        {question.type === "ordering" && <OrderingQuestion question={question} onAnswer={handleAnswer} key={question.id} />}
+        {question.type === "punnett" && <PunnettQuestion question={question} onAnswer={handleAnswer} key={question.id} />}
+        {question.type === "error_id" && <ErrorIDQuestion question={question} onAnswer={handleAnswer} key={question.id} />}
+      </div>
+      {answered !== null && (
+        <div className={`p-3 rounded-xl border-2 text-sm ${answered ? "border-green-400 bg-green-50 text-green-800" : "border-red-400 bg-red-50 text-red-800"}`}>
+          <p className="font-bold mb-1">{answered ? "✅ Correct!" : "❌ Not quite."}</p>
+          <p>{question.explanation}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Board component ──────────────────────────────────────────
+function Board({ players }) {
+  // Snake layout: row 1 (1-6), row 2 right-to-left (12-7), row 3 (13-18), row 4 (24-19), row 5 (25-30)
+  const rows = [
+    [1,2,3,4,5,6],
+    [12,11,10,9,8,7],
+    [13,14,15,16,17,18],
+    [24,23,22,21,20,19],
+    [25,26,27,28,29,30],
+  ];
+
+  return (
+    <div className="select-none">
+      {rows.map((row, ri) => (
+        <div key={ri} className="flex gap-1 mb-1 justify-center">
+          {row.map(space => {
+            const z = zoneOf(space);
+            const playersHere = players.filter(p => p.position === space);
+            const isStart = space === 1;
+            const isEnd = space === 30;
+            return (
+              <div key={space}
+                className={`relative w-10 h-10 rounded-lg border-2 flex items-center justify-center text-xs font-bold
+                  ${z.spaceBg} ${z.border} ${isEnd ? "ring-2 ring-yellow-400 ring-offset-1" : ""}`}>
+                {isStart && <span className="absolute -top-3 text-xs">🏁</span>}
+                {isEnd && <span className="absolute -top-3 text-xs">⭐</span>}
+                <span className={`${z.text} opacity-70 text-xs`}>{space}</span>
+                <div className="absolute -top-1 -right-1 flex">
+                  {playersHere.map(p => (
+                    <div key={p.id} className={`w-3 h-3 rounded-full border border-white ${PCOLORS[p.colorIdx].bg}`}/>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ))}
+      <div className="flex flex-wrap gap-1 mt-3 justify-center">
+        {ZONES.map(z => (
+          <div key={z.id} className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs ${z.bg} ${z.text} border ${z.border}`}>
+            <span>{z.emoji}</span><span className="font-medium">{z.short}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Multiplayer turn flow ─────────────────────────────────────
+function MultiplayerGame() {
+  const [playerCount, setPlayerCount] = useState(null);
+  const [names, setNames] = useState(["","","",""]);
+  const [players, setPlayers] = useState([]);
+  const [setupDone, setSetupDone] = useState(false);
+  const [currentPlayerIdx, setCurrentPlayerIdx] = useState(0);
+  const [phase, setPhase] = useState("selectDifficulty");
+  const [currentQ, setCurrentQ] = useState(null);
+  const [donQuestion, setDonQuestion] = useState(null);
+  const [spacesEarned, setSpacesEarned] = useState(0);
+  const [usedIds] = useState(new Set());
+  const [lastResult, setLastResult] = useState(null);
+  const [showBoard, setShowBoard] = useState(true);
+
+  const diffMap = { easy: 1, medium: 2, hard: 3 };
+
+  const currentPlayer = players[currentPlayerIdx] || {};
+  const zone = zoneOf(Math.max(1, currentPlayer.position || 1));
+
+  const selectDifficulty = (diff) => {
+    const zoneId = Math.ceil(Math.max(1, currentPlayer.position) / 6);
+    const q = randomQuestion(zoneId, diff, usedIds);
+    usedIds.add(q.id);
+    setCurrentQ(q);
+    setSpacesEarned(diffMap[diff]);
+    setPhase("question");
+  };
+
+  const handleMainAnswer = (correct) => {
+    if (correct) {
+      setLastResult("correct");
+      setPhase("doubleOrNothing");
+    } else {
+      setLastResult("wrong");
+      setPhase("result");
+    }
+  };
+
+  const acceptDon = () => {
+    const nextDiff = { easy:"medium", medium:"hard", hard:"hard" }[currentQ.difficulty];
+    const zoneId = Math.ceil(Math.max(1, currentPlayer.position) / 6);
+    const q = randomQuestion(zoneId, nextDiff, usedIds);
+    usedIds.add(q.id);
+    setDonQuestion(q);
+    setPhase("donq");
+  };
+
+  const declineDon = () => {
+    movePlayer(spacesEarned);
+    setPhase("result");
+  };
+
+  const handleDonAnswer = (correct) => {
+    if (correct) {
+      setSpacesEarned(s => s * 2);
+      setLastResult("donCorrect");
+    } else {
+      setSpacesEarned(0);
+      setLastResult("donWrong");
+    }
+    setPhase("result");
+    if (correct) setTimeout(() => { movePlayer(spacesEarned * 2); }, 100);
+    else movePlayer(0);
+  };
+
+  const movePlayer = useCallback((spaces) => {
+    setPlayers(prev => prev.map((p, i) => {
+      if (i !== currentPlayerIdx) return p;
+      const newPos = Math.min(30, p.position + spaces);
+      return { ...p, position: newPos };
+    }));
+  }, [currentPlayerIdx]);
+
+  const nextTurn = () => {
+    const newPos = players[currentPlayerIdx].position;
+    if (newPos >= 30) { setPhase("gameOver"); return; }
+    setCurrentPlayerIdx(i => (i + 1) % players.length);
+    setPhase("selectDifficulty");
+    setCurrentQ(null);
+    setDonQuestion(null);
+    setLastResult(null);
+    setSpacesEarned(0);
+    setShowBoard(true);
+  };
+
+  if (!playerCount) return (
+    <div className="space-y-4">
+      <div className="text-center">
+        <h2 className="text-xl font-bold text-gray-800 mb-1">🧬 Board Game Mode</h2>
+        <p className="text-sm text-gray-500">Race to space 30 across 5 topic zones</p>
+      </div>
+      <div className="space-y-2">
+        <p className="text-sm font-medium text-gray-700 text-center">How many players?</p>
+        {[2,3,4].map(n => (
+          <button key={n} onClick={() => setPlayerCount(n)}
+            className="w-full py-4 rounded-xl border-2 border-gray-200 bg-white hover:bg-blue-50 hover:border-blue-400 font-bold text-lg transition-all">
+            {n} Players
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+
+  if (!setupDone) {
+    const [names, setNames] = useState(Array(playerCount).fill(""));
+    const ready = names.every(n => n.trim().length > 0);
+    return (
+      <div className="space-y-4">
+        <h2 className="text-lg font-bold text-center">Enter player names</h2>
+        {Array(playerCount).fill(0).map((_, i) => (
+          <div key={i} className="flex items-center gap-3">
+            <div className={`w-8 h-8 rounded-full ${PCOLORS[i].bg} flex-shrink-0`}/>
+            <input value={names[i]} onChange={e => { const n=[...names]; n[i]=e.target.value; setNames(n); }}
+              placeholder={`Player ${i+1} name`}
+              className="flex-1 border-2 border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-400"/>
+          </div>
+        ))}
+        <button onClick={() => {
+          setPlayers(names.map((name, i) => ({ id: i, name: name.trim() || `Player ${i+1}`, position: 0, colorIdx: i })));
+          setSetupDone(true);
+        }} disabled={!ready}
+          className={`w-full py-3 rounded-xl font-bold text-white transition-all ${ready ? "bg-blue-600 hover:bg-blue-700" : "bg-gray-300 cursor-not-allowed"}`}>
+          Start Game →
+        </button>
+      </div>
+    );
+  }
+
+  if (phase === "gameOver") {
+    const winner = [...players].sort((a,b) => b.position - a.position)[0];
+    return (
+      <div className="text-center space-y-4">
+        <div className="text-6xl">🏆</div>
+        <h2 className="text-2xl font-bold">{winner.name} wins!</h2>
+        <p className="text-gray-600">Reached space {winner.position} first</p>
+        <div className="space-y-2">
+          {players.sort((a,b)=>b.position-a.position).map((p,i) => (
+            <div key={p.id} className={`flex items-center gap-3 p-3 rounded-xl ${i===0 ? "bg-yellow-50 border-2 border-yellow-400":""}`}>
+              <div className={`w-8 h-8 rounded-full ${PCOLORS[p.colorIdx].bg}`}/>
+              <span className="font-bold">{p.name}</span>
+              <span className="ml-auto text-gray-600">Space {p.position}</span>
+              {i===0&&<span>👑</span>}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  const pc = PCOLORS[currentPlayer.colorIdx] || PCOLORS[0];
+
+  return (
+    <div className="space-y-4">
+      {/* Player indicator */}
+      <div className={`flex items-center gap-3 p-3 rounded-xl ${pc.bg} bg-opacity-10 border-2`} style={{borderColor: pc.hex || "#888"}}>
+        <div className={`w-10 h-10 rounded-full ${pc.bg} flex items-center justify-center text-white font-bold`}>
+          {currentPlayer.name?.[0]?.toUpperCase()}
+        </div>
+        <div>
+          <p className="font-bold text-sm">{currentPlayer.name}'s turn</p>
+          <p className="text-xs text-gray-500">Space {currentPlayer.position} → {zone.name}</p>
+        </div>
+        <div className="ml-auto flex gap-1">
+          {players.map(p => (
+            <div key={p.id} title={`${p.name}: space ${p.position}`}
+              className={`w-6 h-6 rounded-full border-2 border-white ${PCOLORS[p.colorIdx].bg} flex items-center justify-center text-white text-xs font-bold`}>
+              {p.position}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Board toggle */}
+      <button onClick={() => setShowBoard(b=>!b)} className="w-full py-2 text-xs text-blue-600 underline">
+        {showBoard ? "▲ Hide board" : "▼ Show board"}
+      </button>
+      {showBoard && <Board players={players} />}
+
+      {/* Turn phases */}
+      {phase === "selectDifficulty" && (
+        <div className="space-y-3">
+          <p className="text-center font-bold text-gray-700">Choose your question difficulty:</p>
+          {[
+            { d:"easy",   label:"Easy",   spaces:1, desc:"Multiple choice or True/False",        emoji:"🟢" },
+            { d:"medium", label:"Medium", spaces:2, desc:"Matching or Sequence ordering",          emoji:"🟡" },
+            { d:"hard",   label:"Hard",   spaces:3, desc:"Punnett square, Error ID, or Scenario", emoji:"🔴" },
+          ].map(opt => (
+            <button key={opt.d} onClick={() => selectDifficulty(opt.d)}
+              className={`w-full text-left p-4 rounded-xl border-2 transition-all hover:scale-105 active:scale-95
+                ${opt.d==="easy" ? "border-green-300 bg-green-50 hover:border-green-500" 
+                : opt.d==="medium" ? "border-yellow-300 bg-yellow-50 hover:border-yellow-500"
+                : "border-red-300 bg-red-50 hover:border-red-500"}`}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-lg mr-2">{opt.emoji}</span>
+                  <span className="font-bold">{opt.label}</span>
+                  <span className="ml-2 text-xs text-gray-500">{opt.desc}</span>
+                </div>
+                <span className="font-bold text-lg">+{opt.spaces} 🏃</span>
+              </div>
+            </button>
+          ))}
+          <p className={`text-xs text-center ${zone.text}`}>Topic zone: {zone.emoji} {zone.name}</p>
+        </div>
+      )}
+
+      {phase === "question" && currentQ && (
+        <div className={`p-4 rounded-2xl border-2 ${zone.bg} ${zone.border}`}>
+          <QuestionDisplay question={currentQ} onAnswer={handleMainAnswer} />
+        </div>
+      )}
+
+      {phase === "doubleOrNothing" && (
+        <div className="text-center space-y-4 p-4 bg-gradient-to-br from-yellow-50 to-orange-50 rounded-2xl border-2 border-yellow-400">
+          <div className="text-4xl">⚡</div>
+          <h3 className="text-lg font-bold">Double or Nothing!</h3>
+          <p className="text-sm text-gray-600">
+            You earned <strong>{spacesEarned} space{spacesEarned>1?"s":""}</strong>.<br/>
+            Answer a harder question to <strong>double to {spacesEarned*2}</strong> spaces<br/>
+            or lose your movement this turn.
+          </p>
+          <div className="flex gap-3">
+            <button onClick={declineDon} className="flex-1 py-3 bg-gray-200 text-gray-700 rounded-xl font-bold hover:bg-gray-300 transition-all">
+              Keep {spacesEarned} ✓
+            </button>
+            <button onClick={acceptDon} className="flex-1 py-3 bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-xl font-bold hover:opacity-90 transition-all">
+              Double it! ⚡
+            </button>
+          </div>
+        </div>
+      )}
+
+      {phase === "donq" && donQuestion && (
+        <div className="p-4 rounded-2xl border-2 border-orange-400 bg-orange-50">
+          <div className="text-center mb-3">
+            <span className="text-xs font-bold text-orange-600 bg-orange-100 px-2 py-1 rounded-full">⚡ DOUBLE OR NOTHING</span>
+          </div>
+          <QuestionDisplay question={donQuestion} onAnswer={handleDonAnswer} />
+        </div>
+      )}
+
+      {phase === "result" && (
+        <div className={`p-4 rounded-2xl text-center space-y-3 ${
+          lastResult==="donWrong" ? "bg-red-50 border-2 border-red-300" 
+          : lastResult==="wrong" ? "bg-gray-50 border-2 border-gray-300" 
+          : "bg-green-50 border-2 border-green-300"}`}>
+          <div className="text-4xl">
+            {lastResult==="donWrong" ? "💥" : lastResult==="wrong" ? "😬" : "🎉"}
+          </div>
+          <h3 className="font-bold text-lg">
+            {lastResult==="donWrong" ? "Doubled down… and lost!" 
+            : lastResult==="wrong" ? "No movement this turn"
+            : lastResult==="donCorrect" ? `Doubled! Moving ${spacesEarned} spaces!`
+            : `Moving ${spacesEarned} space${spacesEarned>1?"s":""}!`}
+          </h3>
+          <p className="text-sm text-gray-600">
+            {currentPlayer.name} → Space {Math.min(30, currentPlayer.position + (lastResult==="donWrong"||lastResult==="wrong"?0:spacesEarned))}
+          </p>
+          <button onClick={nextTurn} className="w-full py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-all">
+            {players[(currentPlayerIdx+1)%players.length]?.name}'s Turn →
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Solo mode ─────────────────────────────────────────────────
+function SoloMode() {
+  const [selectedZone, setSelectedZone] = useState(null);
+  const [selectedDiff, setSelectedDiff] = useState(null);
+  const [currentQ, setCurrentQ] = useState(null);
+  const [score, setScore] = useState({ correct: 0, total: 0 });
+  const [usedIds] = useState(new Set());
+  const [phase, setPhase] = useState("setup"); // setup | question | feedback
+
+  const startSession = () => {
+    const zone = selectedZone === 0 ? Math.ceil(Math.random() * 5) : selectedZone;
+    const diffs = selectedDiff === "all" ? ["easy","medium","hard"] : [selectedDiff];
+    const diff = diffs[Math.floor(Math.random() * diffs.length)];
+    const zoneActual = selectedZone === 0 ? zone : selectedZone;
+    const q = randomQuestion(zoneActual, diff, usedIds);
+    usedIds.add(q.id);
+    setCurrentQ(q);
+    setPhase("question");
+  };
+
+  const nextQ = () => {
+    const zone = selectedZone === 0 ? Math.ceil(Math.random() * 5) : selectedZone;
+    const diffs = selectedDiff === "all" ? ["easy","medium","hard"] : [selectedDiff];
+    const diff = diffs[Math.floor(Math.random() * diffs.length)];
+    const q = randomQuestion(zone, diff, usedIds);
+    usedIds.add(q.id);
+    setCurrentQ(q);
+    setPhase("question");
+  };
+
+  const handleAnswer = (correct) => {
+    setScore(s => ({ correct: s.correct + (correct ? 1 : 0), total: s.total + 1 }));
+  };
+
+  if (phase === "setup") return (
+    <div className="space-y-5">
+      <div className="text-center">
+        <h2 className="text-xl font-bold text-gray-800">📚 Solo Study Mode</h2>
+        <p className="text-sm text-gray-500 mt-1">No pressure — learn at your own pace</p>
+      </div>
+      <div>
+        <p className="text-sm font-semibold text-gray-700 mb-2">Choose a topic zone:</p>
+        <div className="space-y-2">
+          <button onClick={() => setSelectedZone(0)}
+            className={`w-full p-3 rounded-xl border-2 text-sm font-medium transition-all ${selectedZone===0?"border-blue-500 bg-blue-50":"border-gray-200 bg-white hover:border-gray-300"}`}>
+            🌐 All Zones (random)
+          </button>
+          {ZONES.map(z => (
+            <button key={z.id} onClick={() => setSelectedZone(z.id)}
+              className={`w-full p-3 rounded-xl border-2 text-sm font-medium transition-all text-left ${selectedZone===z.id?`${z.border} ${z.bg}`:"border-gray-200 bg-white hover:border-gray-300"}`}>
+              {z.emoji} Zone {z.id}: {z.name}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div>
+        <p className="text-sm font-semibold text-gray-700 mb-2">Choose difficulty:</p>
+        <div className="grid grid-cols-2 gap-2">
+          {[{v:"all",l:"All difficulties"},{v:"easy",l:"🟢 Easy"},{v:"medium",l:"🟡 Medium"},{v:"hard",l:"🔴 Hard"}].map(opt => (
+            <button key={opt.v} onClick={() => setSelectedDiff(opt.v)}
+              className={`p-3 rounded-xl border-2 text-sm font-medium transition-all ${selectedDiff===opt.v?"border-blue-500 bg-blue-50":"border-gray-200 bg-white hover:border-gray-300"}`}>
+              {opt.l}
+            </button>
+          ))}
+        </div>
+      </div>
+      <button onClick={startSession} disabled={selectedZone===null||!selectedDiff}
+        className={`w-full py-4 rounded-xl font-bold text-white text-lg transition-all ${selectedZone!==null&&selectedDiff?"bg-blue-600 hover:bg-blue-700":"bg-gray-300 cursor-not-allowed"}`}>
+        Start Studying →
+      </button>
+    </div>
+  );
+
+  const pct = score.total > 0 ? Math.round(100 * score.correct / score.total) : 0;
+
+  return (
+    <div className="space-y-4">
+      {/* Score bar */}
+      <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl border">
+        <div className="flex-1">
+          <div className="flex justify-between text-xs text-gray-500 mb-1">
+            <span>Score: {score.correct}/{score.total}</span>
+            <span>{score.total > 0 ? pct+"%" : "--"}</span>
+          </div>
+          <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+            <div className={`h-full rounded-full transition-all ${pct>=80?"bg-green-500":pct>=60?"bg-yellow-500":"bg-blue-500"}`}
+              style={{width: score.total ? pct+"%" : "0%"}}/>
+          </div>
+        </div>
+        <button onClick={() => { setPhase("setup"); setScore({correct:0,total:0}); }}
+          className="text-xs text-gray-400 hover:text-gray-600 underline">Change zone</button>
+      </div>
+
+      {currentQ && (
+        <div className={`p-4 rounded-2xl border-2 ${getZone(currentQ.zone).bg} ${getZone(currentQ.zone).border}`}>
+          <QuestionDisplay question={currentQ} onAnswer={handleAnswer} key={currentQ.id} />
+        </div>
+      )}
+
+      <button onClick={nextQ} className="w-full py-3 bg-gray-800 text-white rounded-xl font-bold hover:bg-gray-700 transition-all">
+        Next Question →
+      </button>
+    </div>
+  );
+}
+
+// ── Home screen ──────────────────────────────────────────────
+function HomeScreen({ onMode }) {
+  return (
+    <div className="space-y-6">
+      <div className="text-center pt-4">
+        <div className="text-5xl mb-3">🧬</div>
+        <h1 className="text-2xl font-black text-gray-900 tracking-tight">Bio376 Genetics</h1>
+        <h2 className="text-xl font-black text-blue-600 tracking-tight">Review Game</h2>
+        <p className="text-sm text-gray-500 mt-2">UH Hilo • Spring 2026</p>
+      </div>
+
+      <div className="grid grid-cols-5 gap-1">
+        {ZONES.map(z => (
+          <div key={z.id} className={`p-2 rounded-xl ${z.bg} border ${z.border} text-center`}>
+            <div className="text-xl">{z.emoji}</div>
+            <div className={`text-xs font-bold ${z.text} leading-tight mt-1`}>{z.short}</div>
+          </div>
+        ))}
+      </div>
+
+      <div className="space-y-3">
+        <button onClick={() => onMode("solo")}
+          className="w-full p-5 rounded-2xl bg-gradient-to-r from-blue-600 to-blue-700 text-white text-left hover:from-blue-700 hover:to-blue-800 transition-all active:scale-98 shadow-lg">
+          <div className="text-2xl mb-1">📚</div>
+          <div className="font-black text-lg">Solo Study Mode</div>
+          <div className="text-blue-200 text-sm">Practice any topic zone at your own pace with immediate feedback</div>
+        </button>
+        <button onClick={() => onMode("multi")}
+          className="w-full p-5 rounded-2xl bg-gradient-to-r from-purple-600 to-pink-600 text-white text-left hover:from-purple-700 hover:to-pink-700 transition-all active:scale-98 shadow-lg">
+          <div className="text-2xl mb-1">🎲</div>
+          <div className="font-black text-lg">Board Game Mode</div>
+          <div className="text-purple-200 text-sm">2–4 players race across 30 spaces • Double-or-Nothing gambles • First to space 30 wins!</div>
+        </button>
+      </div>
+
+      <div className="text-center text-xs text-gray-400 space-y-1 pb-4">
+        <p>120 questions across 5 exam zones</p>
+        <p>Content from Bio376 lecture slides</p>
+        <p>Multiple choice · T/F · Matching · Punnett squares · more</p>
+      </div>
+    </div>
+  );
+}
+
+// ── App root ─────────────────────────────────────────────────
+export default function App() {
+  const [screen, setScreen] = useState("home");
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-100 to-blue-50 flex items-start justify-center p-4">
+      <div className="w-full max-w-sm bg-white rounded-3xl shadow-2xl overflow-hidden">
+        {/* Header */}
+        <div className="bg-gradient-to-r from-blue-700 to-purple-700 px-4 py-3 flex items-center gap-2">
+          {screen !== "home" && (
+            <button onClick={() => setScreen("home")} className="text-white opacity-70 hover:opacity-100 transition-opacity mr-1 text-lg">←</button>
+          )}
+          <span className="text-white font-black text-sm tracking-wide flex-1 text-center">
+            {screen === "home" ? "BIO 376 GENETICS REVIEW" : screen === "solo" ? "SOLO STUDY" : "BOARD GAME"}
+          </span>
+          <span className="text-white opacity-50 text-xs">UH Hilo</span>
+        </div>
+
+        {/* Content */}
+        <div className="p-4 overflow-y-auto" style={{ maxHeight: "calc(100vh - 100px)" }}>
+          {screen === "home" && <HomeScreen onMode={setScreen} />}
+          {screen === "solo" && <SoloMode />}
+          {screen === "multi" && <MultiplayerGame key="multi" />}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+    const root = ReactDOM.createRoot(document.getElementById("root"));
+    root.render(<App />);
+  </script>
+</body>
+</html>
