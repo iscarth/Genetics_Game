@@ -1,24 +1,35 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Bio376 Genetics Review Game — UH Hilo</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-  <style>body { margin:0; padding:0; background:#f1f5f9; }</style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Bio376 Genetics Review Game · UH Hilo</title>
+<meta name="description" content="Interactive genetics review game for UH Hilo Bio 376. Solo study and 2-4 player board game across 5 topic zones." />
+
+<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+<script src="https://cdn.tailwindcss.com"></script>
+
+<style>
+  html, body { margin: 0; padding: 0; background: #f1f5f9; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+  * { -webkit-tap-highlight-color: transparent; }
+  input[type="text"]:focus { outline: none; }
+</style>
 </head>
 <body>
-  <div id="root"></div>
-  <script>
-    const { useState, useCallback } = React;
-
+<div id="root"></div>
+<script>
 /* ============================================================
    BIO376 GENETICS REVIEW GAME — UH Hilo, Spring 2026
-   Single-file React app. No build step. Tailwind via CDN.
-   All content drawn from Bio376 lecture slides.
+   v2 — multiplayer hooks fixed, visual question types added
    ============================================================ */
+
+const {
+  useState,
+  useCallback,
+  useMemo
+} = React;
 
 // ── Zone configuration ──────────────────────────────────────
 const ZONES = [{
@@ -31,7 +42,8 @@ const ZONES = [{
   text: "text-blue-800",
   header: "bg-blue-600",
   spaceBg: "bg-blue-100",
-  spaceActive: "bg-blue-300"
+  spaceActive: "bg-blue-300",
+  accent: "#2563eb"
 }, {
   id: 2,
   name: "Chromosomes & Linkage",
@@ -42,7 +54,8 @@ const ZONES = [{
   text: "text-green-800",
   header: "bg-green-600",
   spaceBg: "bg-green-100",
-  spaceActive: "bg-green-300"
+  spaceActive: "bg-green-300",
+  accent: "#16a34a"
 }, {
   id: 3,
   name: "Bacterial Genetics & Genomes",
@@ -53,7 +66,8 @@ const ZONES = [{
   text: "text-orange-800",
   header: "bg-orange-500",
   spaceBg: "bg-orange-100",
-  spaceActive: "bg-orange-300"
+  spaceActive: "bg-orange-300",
+  accent: "#ea580c"
 }, {
   id: 4,
   name: "Molecular Genetics",
@@ -64,27 +78,2700 @@ const ZONES = [{
   text: "text-purple-800",
   header: "bg-purple-600",
   spaceBg: "bg-purple-100",
-  spaceActive: "bg-purple-300"
+  spaceActive: "bg-purple-300",
+  accent: "#9333ea"
 }, {
   id: 5,
   name: "Evolution & Pop. Genetics",
   short: "Evolution",
-  emoji: "🌿",
-  bg: "bg-red-50",
-  border: "border-red-400",
-  text: "text-red-800",
-  header: "bg-red-600",
-  spaceBg: "bg-red-100",
-  spaceActive: "bg-red-300"
+  emoji: "🌳",
+  bg: "bg-pink-50",
+  border: "border-pink-400",
+  text: "text-pink-800",
+  header: "bg-pink-600",
+  spaceBg: "bg-pink-100",
+  spaceActive: "bg-pink-300",
+  accent: "#db2777"
 }];
-const zoneOf = s => ZONES[Math.ceil(s / 6) - 1];
 const PCOLORS = [{
-  name: "Crimson",
   bg: "bg-red-500",
-  ring: "ring-red-500",
-  hex: "#DC2626"
+  hex: "#ef4444",
+  name: "Red"
 }, {
-  name: "Ocean",
+  bg: "bg-blue-500",
+  hex: "#3b82f6",
+  name: "Blue"
+}, {
+  bg: "bg-green-500",
+  hex: "#22c55e",
+  name: "Green"
+}, {
+  bg: "bg-yellow-500",
+  hex: "#eab308",
+  name: "Yellow"
+}];
+const getZone = id => ZONES[id - 1];
+const zoneOf = pos => Math.min(5, Math.max(1, Math.ceil(pos / 6)));
+
+// ════════════════════════════════════════════════════════════
+// VISUAL COMPONENTS — SVG-based question content
+// ════════════════════════════════════════════════════════════
+
+// ── Pedigree SVG ────────────────────────────────────────────
+// Renders a 3-generation pedigree from a compact spec.
+// Spec: { gens: [[{sex, affected, id}], ...], couples: [[parentId1, parentId2, [childIds]]] }
+function PedigreeSVG({
+  spec
+}) {
+  const W = 320,
+    rowH = 90;
+  const rows = spec.gens.length;
+  const H = rows * rowH + 20;
+
+  // Layout: evenly space individuals in each generation
+  const positions = {};
+  spec.gens.forEach((gen, gi) => {
+    const n = gen.length;
+    const spacing = W / (n + 1);
+    gen.forEach((ind, i) => {
+      positions[ind.id] = {
+        x: spacing * (i + 1),
+        y: 30 + gi * rowH
+      };
+    });
+  });
+  return /*#__PURE__*/React.createElement("svg", {
+    viewBox: `0 0 ${W} ${H}`,
+    className: "w-full",
+    style: {
+      maxHeight: 280
+    }
+  }, spec.gens.map((_, gi) => /*#__PURE__*/React.createElement("text", {
+    key: gi,
+    x: "8",
+    y: 35 + gi * rowH,
+    fontSize: "11",
+    fill: "#666",
+    fontFamily: "serif"
+  }, ["I", "II", "III", "IV"][gi])), (spec.couples || []).map((c, idx) => {
+    const [p1, p2, kids] = c;
+    const a = positions[p1],
+      b = positions[p2];
+    if (!a || !b) return null;
+    const midX = (a.x + b.x) / 2;
+    const midY = a.y;
+    // Sibship line down to children
+    const kidPositions = kids.map(k => positions[k]).filter(Boolean);
+    if (kidPositions.length === 0) return null;
+    const kidY = kidPositions[0].y;
+    const minKidX = Math.min(...kidPositions.map(p => p.x));
+    const maxKidX = Math.max(...kidPositions.map(p => p.x));
+    return /*#__PURE__*/React.createElement("g", {
+      key: idx,
+      stroke: "#444",
+      strokeWidth: "1.5",
+      fill: "none"
+    }, /*#__PURE__*/React.createElement("line", {
+      x1: a.x + 12,
+      y1: midY,
+      x2: b.x - 12,
+      y2: midY
+    }), /*#__PURE__*/React.createElement("line", {
+      x1: midX,
+      y1: midY,
+      x2: midX,
+      y2: (midY + kidY) / 2
+    }), /*#__PURE__*/React.createElement("line", {
+      x1: minKidX,
+      y1: (midY + kidY) / 2,
+      x2: maxKidX,
+      y2: (midY + kidY) / 2
+    }), kidPositions.map((kp, j) => /*#__PURE__*/React.createElement("line", {
+      key: j,
+      x1: kp.x,
+      y1: (midY + kidY) / 2,
+      x2: kp.x,
+      y2: kp.y - 12
+    })));
+  }), spec.gens.flatMap((gen, gi) => gen.map((ind, i) => {
+    const p = positions[ind.id];
+    const fill = ind.affected ? "#dc2626" : "#fff";
+    const stroke = "#222";
+    const isMale = ind.sex === "M";
+    return /*#__PURE__*/React.createElement("g", {
+      key: ind.id
+    }, isMale ? /*#__PURE__*/React.createElement("rect", {
+      x: p.x - 11,
+      y: p.y - 11,
+      width: "22",
+      height: "22",
+      fill: fill,
+      stroke: stroke,
+      strokeWidth: "1.8"
+    }) : /*#__PURE__*/React.createElement("circle", {
+      cx: p.x,
+      cy: p.y,
+      r: "11",
+      fill: fill,
+      stroke: stroke,
+      strokeWidth: "1.8"
+    }), /*#__PURE__*/React.createElement("text", {
+      x: p.x,
+      y: p.y + 26,
+      textAnchor: "middle",
+      fontSize: "9",
+      fill: "#555"
+    }, ind.label || ind.id), ind.proband && /*#__PURE__*/React.createElement("text", {
+      x: p.x - 14,
+      y: p.y + 5,
+      fontSize: "11",
+      fill: "#dc2626"
+    }, "\u2192"));
+  })), /*#__PURE__*/React.createElement("g", {
+    transform: `translate(${W - 100}, ${H - 30})`
+  }, /*#__PURE__*/React.createElement("rect", {
+    x: "0",
+    y: "-7",
+    width: "10",
+    height: "10",
+    fill: "#dc2626",
+    stroke: "#222",
+    strokeWidth: "1"
+  }), /*#__PURE__*/React.createElement("text", {
+    x: "14",
+    y: "2",
+    fontSize: "9",
+    fill: "#444"
+  }, "affected"), /*#__PURE__*/React.createElement("rect", {
+    x: "55",
+    y: "-7",
+    width: "10",
+    height: "10",
+    fill: "#fff",
+    stroke: "#222",
+    strokeWidth: "1"
+  }), /*#__PURE__*/React.createElement("text", {
+    x: "69",
+    y: "2",
+    fontSize: "9",
+    fill: "#444"
+  }, "unaffected")));
+}
+
+// ── Karyotype SVG ───────────────────────────────────────────
+// Renders a simplified karyotype: pairs/singletons of chromosomes with bands
+function KaryotypeSVG({
+  spec
+}) {
+  // spec: { autosomes: { 21: 3, ... }, sex: ['X','X'] or ['X','Y'] }
+  // We'll draw a simplified set focusing on the relevant chromosomes
+  const focus = spec.focus || [21, 18, 13]; // which autosomes to show
+  const W = 320,
+    H = 200;
+  const drawChr = (x, y, num, height = 60) => {
+    // Draw a stylized chromosome with bands
+    return /*#__PURE__*/React.createElement("g", {
+      transform: `translate(${x}, ${y})`
+    }, /*#__PURE__*/React.createElement("rect", {
+      x: "-6",
+      y: "0",
+      width: "12",
+      height: height,
+      rx: "3",
+      fill: "#f5e3c4",
+      stroke: "#7c3a1d",
+      strokeWidth: "0.8"
+    }), /*#__PURE__*/React.createElement("rect", {
+      x: "-6",
+      y: height * 0.15,
+      width: "12",
+      height: "3",
+      fill: "#3a3a8c",
+      opacity: "0.7"
+    }), /*#__PURE__*/React.createElement("rect", {
+      x: "-6",
+      y: height * 0.30,
+      width: "12",
+      height: "2",
+      fill: "#3a3a8c",
+      opacity: "0.6"
+    }), /*#__PURE__*/React.createElement("rect", {
+      x: "-6",
+      y: height * 0.55,
+      width: "12",
+      height: "3",
+      fill: "#3a3a8c",
+      opacity: "0.7"
+    }), /*#__PURE__*/React.createElement("rect", {
+      x: "-6",
+      y: height * 0.75,
+      width: "12",
+      height: "2",
+      fill: "#3a3a8c",
+      opacity: "0.6"
+    }), /*#__PURE__*/React.createElement("circle", {
+      cx: "0",
+      cy: height * 0.42,
+      r: "3",
+      fill: "#e8a35a"
+    }), /*#__PURE__*/React.createElement("text", {
+      x: "0",
+      y: height + 14,
+      textAnchor: "middle",
+      fontSize: "9",
+      fill: "#444",
+      fontWeight: "bold"
+    }, num));
+  };
+
+  // Layout the focal autosomes
+  const autosomes = spec.autosomes || {};
+  const sex = spec.sex || ["X", "X"];
+  let cursor = 30;
+  const chromos = [];
+  focus.forEach(num => {
+    const count = autosomes[num] !== undefined ? autosomes[num] : 2;
+    for (let i = 0; i < count; i++) {
+      chromos.push({
+        x: cursor,
+        num,
+        height: num === 21 ? 40 : num === 18 ? 50 : num === 13 ? 55 : 60
+      });
+      cursor += 22;
+    }
+    cursor += 14; // space between groups
+  });
+
+  // Sex chromosomes
+  cursor += 10;
+  sex.forEach(s => {
+    chromos.push({
+      x: cursor,
+      num: s,
+      height: s === "Y" ? 35 : 70
+    });
+    cursor += 22;
+  });
+  return /*#__PURE__*/React.createElement("svg", {
+    viewBox: `0 0 ${Math.max(W, cursor + 20)} ${H}`,
+    className: "w-full",
+    style: {
+      maxHeight: 220
+    }
+  }, /*#__PURE__*/React.createElement("text", {
+    x: "10",
+    y: "20",
+    fontSize: "11",
+    fill: "#444",
+    fontWeight: "bold"
+  }, "Partial karyotype (focal chromosomes)"), chromos.map((c, i) => drawChr(c.x, 40, c.num, c.height)));
+}
+
+// ── Cell-stage SVG (mitosis/meiosis) ────────────────────────
+function CellStageSVG({
+  stage
+}) {
+  // stage: 'mitosis_meta' | 'mitosis_ana' | 'mitosis_pro' | 'mitosis_telo' |
+  //        'meiosis_meta1' | 'meiosis_ana1' | 'meiosis_meta2' | 'meiosis_ana2'
+  const W = 320,
+    H = 200,
+    cx = W / 2,
+    cy = H / 2;
+  const cellR = 75;
+  const renderChromos = () => {
+    // Two pairs of homologs: red (large) + blue (small)
+    const red = "#dc2626",
+      blue = "#2563eb",
+      redLight = "#fca5a5",
+      blueLight = "#93c5fd";
+    if (stage === "mitosis_pro") {
+      // Condensed chromosomes scattered
+      return /*#__PURE__*/React.createElement("g", null, /*#__PURE__*/React.createElement(ChromX, {
+        x: cx - 30,
+        y: cy - 20,
+        color: red,
+        size: 20
+      }), /*#__PURE__*/React.createElement(ChromX, {
+        x: cx + 25,
+        y: cy - 25,
+        color: red,
+        size: 20
+      }), /*#__PURE__*/React.createElement(ChromX, {
+        x: cx - 15,
+        y: cy + 25,
+        color: blue,
+        size: 14
+      }), /*#__PURE__*/React.createElement(ChromX, {
+        x: cx + 30,
+        y: cy + 20,
+        color: blue,
+        size: 14
+      }));
+    }
+    if (stage === "mitosis_meta") {
+      // Aligned on metaphase plate, sister chromatids together
+      return /*#__PURE__*/React.createElement("g", null, /*#__PURE__*/React.createElement("line", {
+        x1: cx,
+        y1: cy - 60,
+        x2: cx,
+        y2: cy + 60,
+        stroke: "#888",
+        strokeWidth: "1",
+        strokeDasharray: "3,3"
+      }), /*#__PURE__*/React.createElement(ChromX, {
+        x: cx,
+        y: cy - 30,
+        color: red,
+        size: 20
+      }), /*#__PURE__*/React.createElement(ChromX, {
+        x: cx,
+        y: cy - 5,
+        color: red,
+        size: 20
+      }), /*#__PURE__*/React.createElement(ChromX, {
+        x: cx,
+        y: cy + 20,
+        color: blue,
+        size: 14
+      }), /*#__PURE__*/React.createElement(ChromX, {
+        x: cx,
+        y: cy + 40,
+        color: blue,
+        size: 14
+      }));
+    }
+    if (stage === "mitosis_ana") {
+      // Sister chromatids pulled apart to opposite poles
+      return /*#__PURE__*/React.createElement("g", null, /*#__PURE__*/React.createElement(ChromI, {
+        x: cx - 40,
+        y: cy - 25,
+        color: red,
+        size: 20
+      }), /*#__PURE__*/React.createElement(ChromI, {
+        x: cx + 40,
+        y: cy - 25,
+        color: red,
+        size: 20
+      }), /*#__PURE__*/React.createElement(ChromI, {
+        x: cx - 40,
+        y: cy + 5,
+        color: red,
+        size: 20
+      }), /*#__PURE__*/React.createElement(ChromI, {
+        x: cx + 40,
+        y: cy + 5,
+        color: red,
+        size: 20
+      }), /*#__PURE__*/React.createElement(ChromI, {
+        x: cx - 40,
+        y: cy + 30,
+        color: blue,
+        size: 14
+      }), /*#__PURE__*/React.createElement(ChromI, {
+        x: cx + 40,
+        y: cy + 30,
+        color: blue,
+        size: 14
+      }), /*#__PURE__*/React.createElement(ChromI, {
+        x: cx - 40,
+        y: cy + 50,
+        color: blue,
+        size: 14
+      }), /*#__PURE__*/React.createElement(ChromI, {
+        x: cx + 40,
+        y: cy + 50,
+        color: blue,
+        size: 14
+      }));
+    }
+    if (stage === "meiosis_meta1") {
+      // Bivalents (homolog pairs) aligned at metaphase plate
+      return /*#__PURE__*/React.createElement("g", null, /*#__PURE__*/React.createElement("line", {
+        x1: cx,
+        y1: cy - 60,
+        x2: cx,
+        y2: cy + 60,
+        stroke: "#888",
+        strokeWidth: "1",
+        strokeDasharray: "3,3"
+      }), /*#__PURE__*/React.createElement("g", {
+        transform: `translate(${cx - 20}, ${cy - 25})`
+      }, /*#__PURE__*/React.createElement(ChromX, {
+        x: 0,
+        y: 0,
+        color: red,
+        size: 20
+      }), /*#__PURE__*/React.createElement(ChromX, {
+        x: 40,
+        y: 0,
+        color: redLight,
+        size: 20
+      }), /*#__PURE__*/React.createElement("line", {
+        x1: "10",
+        y1: "0",
+        x2: "30",
+        y2: "0",
+        stroke: "#444",
+        strokeWidth: "1"
+      })), /*#__PURE__*/React.createElement("g", {
+        transform: `translate(${cx - 15}, ${cy + 25})`
+      }, /*#__PURE__*/React.createElement(ChromX, {
+        x: 0,
+        y: 0,
+        color: blue,
+        size: 14
+      }), /*#__PURE__*/React.createElement(ChromX, {
+        x: 30,
+        y: 0,
+        color: blueLight,
+        size: 14
+      }), /*#__PURE__*/React.createElement("line", {
+        x1: "7",
+        y1: "0",
+        x2: "23",
+        y2: "0",
+        stroke: "#444",
+        strokeWidth: "1"
+      })));
+    }
+    if (stage === "meiosis_ana1") {
+      // Homologs separating (sister chromatids still joined)
+      return /*#__PURE__*/React.createElement("g", null, /*#__PURE__*/React.createElement(ChromX, {
+        x: cx - 50,
+        y: cy - 25,
+        color: red,
+        size: 20
+      }), /*#__PURE__*/React.createElement(ChromX, {
+        x: cx + 50,
+        y: cy - 25,
+        color: redLight,
+        size: 20
+      }), /*#__PURE__*/React.createElement(ChromX, {
+        x: cx - 50,
+        y: cy + 25,
+        color: blue,
+        size: 14
+      }), /*#__PURE__*/React.createElement(ChromX, {
+        x: cx + 50,
+        y: cy + 25,
+        color: blueLight,
+        size: 14
+      }));
+    }
+    if (stage === "meiosis_meta2") {
+      // Single chromosomes (pair of sister chromatids) on metaphase plate
+      return /*#__PURE__*/React.createElement("g", null, /*#__PURE__*/React.createElement("line", {
+        x1: cx,
+        y1: cy - 60,
+        x2: cx,
+        y2: cy + 60,
+        stroke: "#888",
+        strokeWidth: "1",
+        strokeDasharray: "3,3"
+      }), /*#__PURE__*/React.createElement(ChromX, {
+        x: cx,
+        y: cy - 15,
+        color: red,
+        size: 20
+      }), /*#__PURE__*/React.createElement(ChromX, {
+        x: cx,
+        y: cy + 25,
+        color: blue,
+        size: 14
+      }));
+    }
+    if (stage === "meiosis_ana2") {
+      // Sister chromatids separating
+      return /*#__PURE__*/React.createElement("g", null, /*#__PURE__*/React.createElement(ChromI, {
+        x: cx - 35,
+        y: cy - 15,
+        color: red,
+        size: 20
+      }), /*#__PURE__*/React.createElement(ChromI, {
+        x: cx + 35,
+        y: cy - 15,
+        color: red,
+        size: 20
+      }), /*#__PURE__*/React.createElement(ChromI, {
+        x: cx - 35,
+        y: cy + 25,
+        color: blue,
+        size: 14
+      }), /*#__PURE__*/React.createElement(ChromI, {
+        x: cx + 35,
+        y: cy + 25,
+        color: blue,
+        size: 14
+      }));
+    }
+    return null;
+  };
+  return /*#__PURE__*/React.createElement("svg", {
+    viewBox: `0 0 ${W} ${H}`,
+    className: "w-full",
+    style: {
+      maxHeight: 220
+    }
+  }, /*#__PURE__*/React.createElement("ellipse", {
+    cx: cx,
+    cy: cy,
+    rx: cellR + 25,
+    ry: cellR,
+    fill: "#fef3e7",
+    stroke: "#a16207",
+    strokeWidth: "1.5"
+  }), (stage.includes("ana") || stage.includes("meta")) && /*#__PURE__*/React.createElement("g", {
+    stroke: "#888",
+    strokeWidth: "0.6",
+    opacity: "0.5"
+  }, /*#__PURE__*/React.createElement("line", {
+    x1: cx - cellR - 20,
+    y1: cy,
+    x2: cx + cellR + 20,
+    y2: cy,
+    strokeDasharray: "2,2"
+  }), /*#__PURE__*/React.createElement("line", {
+    x1: cx - cellR - 15,
+    y1: cy,
+    x2: cx,
+    y2: cy - 30
+  }), /*#__PURE__*/React.createElement("line", {
+    x1: cx - cellR - 15,
+    y1: cy,
+    x2: cx,
+    y2: cy + 30
+  }), /*#__PURE__*/React.createElement("line", {
+    x1: cx + cellR + 15,
+    y1: cy,
+    x2: cx,
+    y2: cy - 30
+  }), /*#__PURE__*/React.createElement("line", {
+    x1: cx + cellR + 15,
+    y1: cy,
+    x2: cx,
+    y2: cy + 30
+  })), renderChromos());
+}
+
+// X-shaped chromosome (sister chromatids attached)
+function ChromX({
+  x,
+  y,
+  color,
+  size
+}) {
+  const s = size;
+  return /*#__PURE__*/React.createElement("g", {
+    transform: `translate(${x}, ${y})`
+  }, /*#__PURE__*/React.createElement("path", {
+    d: `M ${-s / 2} ${-s / 2} Q ${-s / 4} 0 ${-s / 2} ${s / 2} M ${s / 2} ${-s / 2} Q ${s / 4} 0 ${s / 2} ${s / 2}`,
+    stroke: color,
+    strokeWidth: "5",
+    strokeLinecap: "round",
+    fill: "none"
+  }), /*#__PURE__*/React.createElement("circle", {
+    cx: "0",
+    cy: "0",
+    r: "2",
+    fill: "#444"
+  }));
+}
+// I-shaped chromosome (single chromatid)
+function ChromI({
+  x,
+  y,
+  color,
+  size
+}) {
+  const s = size;
+  return /*#__PURE__*/React.createElement("g", {
+    transform: `translate(${x}, ${y})`
+  }, /*#__PURE__*/React.createElement("path", {
+    d: `M 0 ${-s / 2} Q ${s / 8} 0 0 ${s / 2}`,
+    stroke: color,
+    strokeWidth: "5",
+    strokeLinecap: "round",
+    fill: "none"
+  }));
+}
+
+// ── Gel electrophoresis SVG ─────────────────────────────────
+function GelSVG({
+  lanes,
+  ladder
+}) {
+  // lanes: [{label, bands: [size]}], ladder: [size1, size2, ...]
+  const W = 320,
+    H = 230;
+  const gelTop = 50,
+    gelBottom = 200;
+  const gelHeight = gelBottom - gelTop;
+  const allSizes = ladder || [10, 8, 6, 5, 4, 3, 2, 1];
+  const maxSize = Math.max(...allSizes);
+  const minSize = Math.min(...allSizes);
+
+  // Log scale: smaller fragments migrate further (lower y is bigger)
+  // Position based on log of size
+  const logMax = Math.log(maxSize);
+  const logMin = Math.log(minSize);
+  const yForSize = sz => {
+    const lg = Math.log(sz);
+    const t = (logMax - lg) / (logMax - logMin);
+    return gelTop + t * gelHeight;
+  };
+  const numLanes = lanes.length + 1; // +1 for ladder
+  const laneWidth = (W - 60) / numLanes;
+  const startX = 50;
+  return /*#__PURE__*/React.createElement("svg", {
+    viewBox: `0 0 ${W} ${H}`,
+    className: "w-full",
+    style: {
+      maxHeight: 260
+    }
+  }, /*#__PURE__*/React.createElement("rect", {
+    x: startX - 5,
+    y: gelTop - 10,
+    width: numLanes * laneWidth + 10,
+    height: gelHeight + 30,
+    fill: "#dbeafe",
+    stroke: "#1e40af",
+    strokeWidth: "1.5",
+    rx: "3"
+  }), Array.from({
+    length: numLanes
+  }).map((_, i) => /*#__PURE__*/React.createElement("rect", {
+    key: i,
+    x: startX + i * laneWidth + laneWidth * 0.2,
+    y: gelTop - 8,
+    width: laneWidth * 0.6,
+    height: "6",
+    fill: "#1e3a8a",
+    opacity: "0.6"
+  })), allSizes.map((sz, i) => /*#__PURE__*/React.createElement("g", {
+    key: i
+  }, /*#__PURE__*/React.createElement("text", {
+    x: "40",
+    y: yForSize(sz) + 3,
+    textAnchor: "end",
+    fontSize: "9",
+    fill: "#555"
+  }, sz))), /*#__PURE__*/React.createElement("text", {
+    x: "20",
+    y: gelTop - 18,
+    fontSize: "9",
+    fill: "#555"
+  }, "kb"), /*#__PURE__*/React.createElement("g", null, allSizes.map((sz, i) => /*#__PURE__*/React.createElement("rect", {
+    key: i,
+    x: startX + laneWidth * 0.15,
+    y: yForSize(sz) - 1.5,
+    width: laneWidth * 0.7,
+    height: "3",
+    fill: "#1e3a8a",
+    opacity: "0.85"
+  })), /*#__PURE__*/React.createElement("text", {
+    x: startX + laneWidth / 2,
+    y: H - 8,
+    textAnchor: "middle",
+    fontSize: "9",
+    fill: "#444",
+    fontWeight: "bold"
+  }, "ladder")), lanes.map((lane, li) => /*#__PURE__*/React.createElement("g", {
+    key: li
+  }, lane.bands.map((sz, bi) => /*#__PURE__*/React.createElement("rect", {
+    key: bi,
+    x: startX + (li + 1) * laneWidth + laneWidth * 0.15,
+    y: yForSize(sz) - 1.8,
+    width: laneWidth * 0.7,
+    height: "3.5",
+    fill: "#1e3a8a"
+  })), /*#__PURE__*/React.createElement("text", {
+    x: startX + (li + 1) * laneWidth + laneWidth / 2,
+    y: H - 8,
+    textAnchor: "middle",
+    fontSize: "9",
+    fill: "#444",
+    fontWeight: "bold"
+  }, lane.label))), /*#__PURE__*/React.createElement("g", {
+    transform: `translate(${W - 30}, ${gelTop + gelHeight / 2})`
+  }, /*#__PURE__*/React.createElement("line", {
+    x1: "0",
+    y1: "-25",
+    x2: "0",
+    y2: "25",
+    stroke: "#dc2626",
+    strokeWidth: "1.5"
+  }), /*#__PURE__*/React.createElement("polygon", {
+    points: "-3,18 0,25 3,18",
+    fill: "#dc2626"
+  }), /*#__PURE__*/React.createElement("text", {
+    x: "0",
+    y: "-30",
+    textAnchor: "middle",
+    fontSize: "8",
+    fill: "#dc2626"
+  }, "+ pole")));
+}
+
+// ── DNA / Codon visual ──────────────────────────────────────
+function SequenceSVG({
+  dna,
+  mrna,
+  protein,
+  highlight
+}) {
+  // Renders a DNA/mRNA/protein triple aligned vertically
+  const baseW = 18;
+  const dnaArr = (dna || "").split("");
+  const mrnaArr = (mrna || "").split("");
+  const W = Math.max(280, dnaArr.length * baseW + 60);
+  const H = 130;
+  const colorOf = b => ({
+    A: "#22c55e",
+    T: "#dc2626",
+    U: "#dc2626",
+    G: "#eab308",
+    C: "#3b82f6"
+  })[b] || "#888";
+  return /*#__PURE__*/React.createElement("svg", {
+    viewBox: `0 0 ${W} ${H}`,
+    className: "w-full",
+    style: {
+      maxHeight: 160
+    }
+  }, dna && /*#__PURE__*/React.createElement("g", null, /*#__PURE__*/React.createElement("text", {
+    x: "5",
+    y: "20",
+    fontSize: "10",
+    fill: "#444",
+    fontWeight: "bold"
+  }, "DNA"), dnaArr.map((b, i) => /*#__PURE__*/React.createElement("g", {
+    key: i
+  }, /*#__PURE__*/React.createElement("rect", {
+    x: 45 + i * baseW,
+    y: "10",
+    width: baseW - 2,
+    height: "18",
+    fill: colorOf(b),
+    opacity: highlight && highlight.includes(i) ? "1" : "0.7",
+    stroke: highlight && highlight.includes(i) ? "#000" : "none",
+    strokeWidth: "1.5"
+  }), /*#__PURE__*/React.createElement("text", {
+    x: 45 + i * baseW + (baseW - 2) / 2,
+    y: "23",
+    textAnchor: "middle",
+    fontSize: "11",
+    fill: "#fff",
+    fontWeight: "bold"
+  }, b)))), mrna && /*#__PURE__*/React.createElement("g", null, /*#__PURE__*/React.createElement("text", {
+    x: "5",
+    y: "55",
+    fontSize: "10",
+    fill: "#444",
+    fontWeight: "bold"
+  }, "mRNA"), mrnaArr.map((b, i) => /*#__PURE__*/React.createElement("g", {
+    key: i
+  }, /*#__PURE__*/React.createElement("rect", {
+    x: 45 + i * baseW,
+    y: "45",
+    width: baseW - 2,
+    height: "18",
+    fill: colorOf(b),
+    opacity: highlight && highlight.includes(i) ? "1" : "0.7",
+    stroke: highlight && highlight.includes(i) ? "#000" : "none",
+    strokeWidth: "1.5"
+  }), /*#__PURE__*/React.createElement("text", {
+    x: 45 + i * baseW + (baseW - 2) / 2,
+    y: "58",
+    textAnchor: "middle",
+    fontSize: "11",
+    fill: "#fff",
+    fontWeight: "bold"
+  }, b)))), protein && /*#__PURE__*/React.createElement("g", null, /*#__PURE__*/React.createElement("text", {
+    x: "5",
+    y: "92",
+    fontSize: "10",
+    fill: "#444",
+    fontWeight: "bold"
+  }, "aa"), protein.map((aa, i) => /*#__PURE__*/React.createElement("g", {
+    key: i
+  }, /*#__PURE__*/React.createElement("rect", {
+    x: 45 + i * 3 * baseW + baseW * 0.5,
+    y: "80",
+    width: baseW * 2,
+    height: "18",
+    fill: "#a78bfa",
+    stroke: "#6d28d9",
+    strokeWidth: "1",
+    rx: "3"
+  }), /*#__PURE__*/React.createElement("text", {
+    x: 45 + i * 3 * baseW + baseW * 1.5,
+    y: "93",
+    textAnchor: "middle",
+    fontSize: "10",
+    fill: "#fff",
+    fontWeight: "bold"
+  }, aa)))));
+}
+
+// ════════════════════════════════════════════════════════════
+// QUESTION BANK
+// ════════════════════════════════════════════════════════════
+const QUESTIONS = [
+// ══════════════════════════════════════════════════════════
+// ZONE 1 — MENDELIAN FOUNDATIONS
+// ══════════════════════════════════════════════════════════
+// — Easy —
+{
+  id: "z1_e1",
+  zone: 1,
+  difficulty: "easy",
+  type: "multiple_choice",
+  prompt: "In a monohybrid cross between two heterozygous parents (Aa × Aa), what is the expected phenotypic ratio of offspring assuming complete dominance?",
+  options: ["1:1", "3:1", "9:3:3:1", "1:2:1"],
+  correct: "B",
+  explanation: "Aa × Aa produces genotypes 1 AA : 2 Aa : 1 aa. With complete dominance, AA and Aa both show the dominant phenotype, giving a 3:1 ratio of dominant to recessive."
+}, {
+  id: "z1_e2",
+  zone: 1,
+  difficulty: "easy",
+  type: "true_false",
+  prompt: "Mendel's Law of Segregation states that during gamete formation, the two alleles for each gene separate so that each gamete carries only one allele.",
+  correct: "True",
+  explanation: "This is the cellular basis of Mendel's first law, observed during anaphase I of meiosis when homologous chromosomes separate."
+}, {
+  id: "z1_e3",
+  zone: 1,
+  difficulty: "easy",
+  type: "multiple_choice",
+  prompt: "An organism with the genotype TtYy is crossed with an organism that is ttyy. What proportion of offspring will be heterozygous at both loci (TtYy)?",
+  options: ["1/16", "1/8", "1/4", "1/2"],
+  correct: "C",
+  explanation: "This is a test cross. TtYy produces 4 gamete types (TY, Ty, tY, ty) in equal proportions. The ttyy parent only produces ty gametes. So 1/4 of offspring will be TtYy."
+}, {
+  id: "z1_e4",
+  zone: 1,
+  difficulty: "easy",
+  type: "multiple_choice",
+  prompt: "What is the genotypic ratio resulting from a cross between two heterozygotes (Aa × Aa)?",
+  options: ["1 AA : 2 Aa : 1 aa", "3 AA : 1 aa", "1 AA : 1 aa", "2 Aa : 1 AA : 1 aa"],
+  correct: "A",
+  explanation: "Each parent produces A and a gametes in equal proportion. The Punnett square gives 1 AA : 2 Aa : 1 aa."
+}, {
+  id: "z1_e5",
+  zone: 1,
+  difficulty: "easy",
+  type: "true_false",
+  prompt: "In incomplete dominance, the heterozygote shows a phenotype that is intermediate between the two homozygous phenotypes.",
+  correct: "True",
+  explanation: "For example, red × white snapdragons producing pink heterozygotes. Neither allele fully masks the other."
+}, {
+  id: "z1_e6",
+  zone: 1,
+  difficulty: "easy",
+  type: "multiple_choice",
+  prompt: "Codominance differs from incomplete dominance because:",
+  options: ["Codominant heterozygotes show a blended phenotype", "Codominant heterozygotes express both alleles fully and simultaneously", "Codominance only occurs in plants", "Codominance produces a 3:1 ratio"],
+  correct: "B",
+  explanation: "In codominance (e.g., AB blood type), both alleles are fully expressed in the heterozygote, not blended. ABO blood type is a classic example."
+}, {
+  id: "z1_e7",
+  zone: 1,
+  difficulty: "easy",
+  type: "multiple_choice",
+  prompt: "In a dihybrid cross between two heterozygotes (RrYy × RrYy), what is the expected phenotypic ratio of offspring?",
+  options: ["3:1", "1:1:1:1", "9:3:3:1", "1:2:1"],
+  correct: "C",
+  explanation: "With independent assortment and complete dominance for both genes, RrYy × RrYy gives 9 R_Y_ : 3 R_yy : 3 rrY_ : 1 rryy."
+}, {
+  id: "z1_e8",
+  zone: 1,
+  difficulty: "easy",
+  type: "true_false",
+  prompt: "Mendel's Law of Independent Assortment applies only when the two genes being considered are on different chromosomes (or very far apart on the same chromosome).",
+  correct: "True",
+  explanation: "Genes that are physically linked on the same chromosome do not assort independently — this is genetic linkage. Independent assortment requires the genes be on separate chromosomes or far enough apart that crossing over makes them effectively unlinked."
+},
+// — Medium —
+{
+  id: "z1_m1",
+  zone: 1,
+  difficulty: "medium",
+  type: "matching",
+  prompt: "Match each cross to its expected phenotypic ratio (assuming complete dominance):",
+  items: [{
+    left: "Aa × Aa",
+    right: "3:1"
+  }, {
+    left: "Aa × aa",
+    right: "1:1"
+  }, {
+    left: "AaBb × AaBb",
+    right: "9:3:3:1"
+  }, {
+    left: "AaBb × aabb",
+    right: "1:1:1:1"
+  }],
+  explanation: "These are the canonical Mendelian ratios. Aa × aa is a test cross (1:1). AaBb × aabb is a dihybrid test cross (1:1:1:1)."
+}, {
+  id: "z1_m2",
+  zone: 1,
+  difficulty: "medium",
+  type: "multiple_choice",
+  prompt: "In a test cross of an organism with phenotype A_B_ that produces offspring in a 1:1:1:1 ratio of phenotypes, what is the genotype of the tested organism?",
+  options: ["AABB", "AaBb", "AaBB", "AABb"],
+  correct: "B",
+  explanation: "A test cross with aabb yielding 1:1:1:1 phenotypes means the tested organism produces all four gamete types in equal proportion, indicating heterozygosity at both loci (AaBb)."
+}, {
+  id: "z1_m3",
+  zone: 1,
+  difficulty: "medium",
+  type: "pedigree_id",
+  prompt: "Examine this pedigree. Which inheritance pattern best fits?",
+  spec: {
+    gens: [[{
+      id: "I-1",
+      sex: "F",
+      affected: false
+    }, {
+      id: "I-2",
+      sex: "M",
+      affected: true
+    }], [{
+      id: "II-1",
+      sex: "M",
+      affected: false
+    }, {
+      id: "II-2",
+      sex: "F",
+      affected: true
+    }, {
+      id: "II-3",
+      sex: "M",
+      affected: true
+    }, {
+      id: "II-4",
+      sex: "F",
+      affected: false
+    }], [{
+      id: "III-1",
+      sex: "M",
+      affected: true
+    }, {
+      id: "III-2",
+      sex: "F",
+      affected: false
+    }, {
+      id: "III-3",
+      sex: "F",
+      affected: true
+    }, {
+      id: "III-4",
+      sex: "M",
+      affected: false
+    }]],
+    couples: [["I-1", "I-2", ["II-2", "II-3"]], ["II-3", "II-4", ["III-3", "III-4"]], ["II-1", "II-2", ["III-1", "III-2"]]]
+  },
+  options: ["Autosomal recessive", "Autosomal dominant", "X-linked recessive", "Y-linked"],
+  correct: "B",
+  explanation: "The trait appears in every generation (no skipping), affects both sexes equally, and every affected child has at least one affected parent. This is the classic pattern of autosomal dominant inheritance."
+}, {
+  id: "z1_m4",
+  zone: 1,
+  difficulty: "medium",
+  type: "multiple_choice",
+  prompt: "In a population of pea plants, you observe a 1:2:1 phenotypic ratio in offspring from a particular cross. This most likely indicates:",
+  options: ["Complete dominance with a heterozygous × heterozygous cross", "Incomplete dominance with a heterozygous × heterozygous cross", "A test cross", "Linked genes"],
+  correct: "B",
+  explanation: "A 1:2:1 phenotypic ratio (matching the genotypic ratio) indicates that the heterozygote has its own distinct phenotype — incomplete dominance. With complete dominance, you'd see 3:1."
+}, {
+  id: "z1_m5",
+  zone: 1,
+  difficulty: "medium",
+  type: "true_false",
+  prompt: "In ABO blood typing, a person with blood type AB will produce offspring with all four blood types (A, B, AB, O) when mated with a heterozygous type O parent.",
+  correct: "False",
+  explanation: "There is no such thing as a 'heterozygous type O' parent in this context — type O is always genotype ii (homozygous). An AB × OO cross gives only A (Ai) and B (Bi) offspring, never AB or O."
+}, {
+  id: "z1_m6",
+  zone: 1,
+  difficulty: "medium",
+  type: "multiple_choice",
+  prompt: "In a population of dogs, coat color is determined by two genes. Gene B (black) is epistatic to gene E (yellow). bbE_ produces brown, B_E_ produces black, and __ee produces yellow regardless of B genotype. From a BbEe × BbEe cross, what is the expected phenotypic ratio?",
+  options: ["9:3:3:1 (4 phenotypes)", "9:3:4 (black:brown:yellow)", "12:3:1 (black:brown:yellow)", "1:1:1:1"],
+  correct: "B",
+  explanation: "BbEe × BbEe gives 9 B_E_ (black) : 3 bbE_ (brown) : 3 B_ee (yellow) : 1 bbee (yellow). The 3 + 1 = 4 yellow combine because ee is epistatic to B/b. Final ratio: 9 black : 3 brown : 4 yellow."
+},
+// — Hard —
+{
+  id: "z1_h1",
+  zone: 1,
+  difficulty: "hard",
+  type: "punnett",
+  prompt: "Cross: AaBb × AaBb. Both genes show complete dominance and assort independently. What is the probability of an offspring being homozygous recessive at BOTH loci (aabb)?",
+  options: ["1/16", "1/8", "3/16", "9/16"],
+  correct: "A",
+  explanation: "P(aa) = 1/4, P(bb) = 1/4. By the product rule (independent assortment): P(aabb) = 1/4 × 1/4 = 1/16."
+}, {
+  id: "z1_h2",
+  zone: 1,
+  difficulty: "hard",
+  type: "multiple_choice",
+  prompt: "A geneticist crosses AaBbCc × AaBbCc, where all three genes assort independently and show complete dominance. What proportion of offspring are expected to show the dominant phenotype at all three loci?",
+  options: ["1/64", "9/64", "27/64", "1/8"],
+  correct: "C",
+  explanation: "P(A_) = 3/4 for each gene. P(A_B_C_) = (3/4)³ = 27/64."
+}, {
+  id: "z1_h3",
+  zone: 1,
+  difficulty: "hard",
+  type: "error_id",
+  prompt: "A student claims: \"In a cross of AaBb × aabb, all four phenotypes will appear in a 9:3:3:1 ratio because there are two genes involved.\" What is the error?",
+  options: ["The error is that only one phenotype will appear", "The 9:3:3:1 ratio applies to two heterozygotes (AaBb × AaBb), not a test cross. AaBb × aabb gives 1:1:1:1", "Two genes always give a 1:2:1 ratio", "There is no error in the student's claim"],
+  correct: "B",
+  explanation: "9:3:3:1 only emerges from heterozygote × heterozygote dihybrid crosses. AaBb × aabb is a dihybrid TEST cross — the homozygous recessive parent contributes only ab gametes, so offspring phenotypes simply mirror the gamete proportions of the AaBb parent: 1 AB : 1 Ab : 1 aB : 1 ab → 1:1:1:1."
+}, {
+  id: "z1_h4",
+  zone: 1,
+  difficulty: "hard",
+  type: "pedigree_id",
+  prompt: "This pedigree shows a rare disease. The proband (arrow) has the condition. Considering that affected individuals appear only in some generations, both parents are unaffected, and the trait appears in both sexes, the most likely inheritance is:",
+  spec: {
+    gens: [[{
+      id: "I-1",
+      sex: "M",
+      affected: false
+    }, {
+      id: "I-2",
+      sex: "F",
+      affected: false
+    }], [{
+      id: "II-1",
+      sex: "F",
+      affected: false
+    }, {
+      id: "II-2",
+      sex: "M",
+      affected: false
+    }, {
+      id: "II-3",
+      sex: "M",
+      affected: true
+    }], [{
+      id: "III-1",
+      sex: "M",
+      affected: true,
+      proband: true
+    }, {
+      id: "III-2",
+      sex: "F",
+      affected: false
+    }, {
+      id: "III-3",
+      sex: "F",
+      affected: true
+    }]],
+    couples: [["I-1", "I-2", ["II-1", "II-3"]], ["II-1", "II-2", ["III-1", "III-2", "III-3"]]]
+  },
+  options: ["Autosomal dominant", "Autosomal recessive", "X-linked dominant", "Y-linked"],
+  correct: "B",
+  explanation: "Affected individuals from unaffected parents (II-1 and II-2 → III-1 and III-3) is the hallmark of a recessive trait. Both sexes affected rules out Y-linked, and the appearance in females from unaffected fathers makes simple X-linked recessive less likely. Autosomal recessive fits best — the unaffected parents must be heterozygous carriers."
+},
+// ══════════════════════════════════════════════════════════
+// ZONE 2 — CHROMOSOMES & LINKAGE
+// ══════════════════════════════════════════════════════════
+// — Easy —
+{
+  id: "z2_e1",
+  zone: 2,
+  difficulty: "easy",
+  type: "multiple_choice",
+  prompt: "During which phase of mitosis do sister chromatids separate and move to opposite poles?",
+  options: ["Prophase", "Metaphase", "Anaphase", "Telophase"],
+  correct: "C",
+  explanation: "In anaphase, the proteins holding sister chromatids together (cohesin at centromeres) are cleaved, and spindle fibers pull the chromatids to opposite poles. Each pole receives one full set of chromosomes."
+}, {
+  id: "z2_e2",
+  zone: 2,
+  difficulty: "easy",
+  type: "true_false",
+  prompt: "Meiosis produces four genetically unique haploid cells from one diploid parent cell.",
+  correct: "True",
+  explanation: "Meiosis includes one round of DNA replication followed by two divisions, yielding 4 haploid cells. Crossing over and independent assortment make each cell genetically unique."
+}, {
+  id: "z2_e3",
+  zone: 2,
+  difficulty: "easy",
+  type: "multiple_choice",
+  prompt: "A normal human male karyotype is written as:",
+  options: ["46,XX", "46,XY", "47,XXY", "45,X"],
+  correct: "B",
+  explanation: "46 total chromosomes: 22 autosome pairs + 1 X + 1 Y = 46,XY. Females are 46,XX."
+}, {
+  id: "z2_e4",
+  zone: 2,
+  difficulty: "easy",
+  type: "multiple_choice",
+  prompt: "In a human female, what does dosage compensation accomplish?",
+  options: ["It doubles X-linked gene expression in females compared to males", "It silences one X chromosome in each somatic cell so that males and females have equivalent X-linked gene dosage", "It removes one X chromosome from each cell during development", "It only operates in germline cells"],
+  correct: "B",
+  explanation: "X-inactivation (Lyonization) silences one of the two X chromosomes in each female somatic cell, forming a Barr body. This equalizes X-linked gene expression between XY males and XX females."
+}, {
+  id: "z2_e5",
+  zone: 2,
+  difficulty: "easy",
+  type: "true_false",
+  prompt: "A female who is a carrier of an X-linked recessive trait has approximately a 50% chance of passing the affected X chromosome to each child.",
+  correct: "True",
+  explanation: "A carrier female (X^a X^A) produces X^a and X^A eggs in equal proportions. Each child has a 50% chance of inheriting the X^a allele."
+}, {
+  id: "z2_e6",
+  zone: 2,
+  difficulty: "easy",
+  type: "multiple_choice",
+  prompt: "Two genes located 5 map units (cM) apart on the same chromosome are best described as:",
+  options: ["Unlinked (assort independently)", "Tightly linked (recombination is rare)", "On different chromosomes", "Always inherited together"],
+  correct: "B",
+  explanation: "5 cM means about 5% recombination frequency — the genes are linked and tend to be inherited together. Unlinked genes show ~50% recombination. Even tightly linked genes are not ALWAYS inherited together — crossing over still occurs occasionally."
+}, {
+  id: "z2_e7",
+  zone: 2,
+  difficulty: "easy",
+  type: "multiple_choice",
+  prompt: "In humans, a 47,XXY karyotype produces:",
+  options: ["Down syndrome", "Turner syndrome", "Klinefelter syndrome", "Patau syndrome"],
+  correct: "C",
+  explanation: "47,XXY is Klinefelter syndrome — phenotypically male individuals who tend to be tall, sterile, and may show mild mental impairment."
+}, {
+  id: "z2_e8",
+  zone: 2,
+  difficulty: "easy",
+  type: "true_false",
+  prompt: "Trisomy 21, the most common viable autosomal trisomy in humans, causes Down syndrome.",
+  correct: "True",
+  explanation: "Trisomy 21 (47,XX,+21 or 47,XY,+21) is the most common viable autosomal trisomy, with characteristic phenotypic features. Most other autosomal trisomies cause early embryonic lethality."
+},
+// — Medium —
+{
+  id: "z2_m1",
+  zone: 2,
+  difficulty: "medium",
+  type: "ordering",
+  prompt: "Place the stages of mitosis in the correct order:",
+  items: ["Prophase", "Metaphase", "Anaphase", "Telophase"],
+  explanation: "Mitosis proceeds through prophase (chromosomes condense), metaphase (alignment on the metaphase plate), anaphase (sister chromatid separation), and telophase (nuclei reform)."
+}, {
+  id: "z2_m2",
+  zone: 2,
+  difficulty: "medium",
+  type: "karyotype_id",
+  prompt: "Examine the partial karyotype shown. The patient is phenotypically female but short in stature with ovarian dysgenesis. Which condition does this karyotype represent?",
+  spec: {
+    focus: [21, 18, 13],
+    autosomes: {
+      21: 2,
+      18: 2,
+      13: 2
+    },
+    sex: ["X"]
+  },
+  options: ["Trisomy 21 (Down syndrome)", "Turner syndrome (45,X)", "Klinefelter syndrome (47,XXY)", "Trisomy 18 (Edwards syndrome)"],
+  correct: "B",
+  explanation: "45,X (only one X chromosome, no second sex chromosome) causes Turner syndrome. Affected individuals are phenotypically female, short, with gonadal dysgenesis. The autosomes appear normal in the focal panel; the abnormality is missing one sex chromosome."
+}, {
+  id: "z2_m3",
+  zone: 2,
+  difficulty: "medium",
+  type: "karyotype_id",
+  prompt: "This partial karyotype is from an infant with characteristic facial features, intellectual disability, and a heart defect. The 21st chromosome group shows three copies. What is the diagnosis?",
+  spec: {
+    focus: [21, 18, 13],
+    autosomes: {
+      21: 3,
+      18: 2,
+      13: 2
+    },
+    sex: ["X", "Y"]
+  },
+  options: ["Patau syndrome (Trisomy 13)", "Edwards syndrome (Trisomy 18)", "Down syndrome (Trisomy 21)", "Cri du chat syndrome"],
+  correct: "C",
+  explanation: "Three copies of chromosome 21 = Down syndrome. This is the most common viable autosomal trisomy in humans."
+}, {
+  id: "z2_m4",
+  zone: 2,
+  difficulty: "medium",
+  type: "stage_id",
+  prompt: "Identify the stage of cell division shown. Note: homologous chromosome pairs (bivalents) are aligned at the metaphase plate as paired bivalents, NOT as individual chromosomes.",
+  spec: "meiosis_meta1",
+  options: ["Mitotic metaphase", "Meiosis I metaphase", "Meiosis II metaphase", "Mitotic anaphase"],
+  correct: "B",
+  explanation: "In meiosis I metaphase, homologous chromosomes pair up as bivalents (tetrads) and align at the metaphase plate together. In mitotic metaphase or meiosis II metaphase, individual chromosomes (sister chromatid pairs) line up singly."
+}, {
+  id: "z2_m5",
+  zone: 2,
+  difficulty: "medium",
+  type: "stage_id",
+  prompt: "Identify this stage. Sister chromatids (still joined at the centromere — note the X-shapes) are moving toward opposite poles, while their homologous partners go to the other pole.",
+  spec: "meiosis_ana1",
+  options: ["Mitotic anaphase", "Meiosis I anaphase", "Meiosis II anaphase", "Prophase II"],
+  correct: "B",
+  explanation: "Anaphase I of meiosis: homologous chromosomes (one of each pair) move to opposite poles, but sister chromatids remain attached. This is the cellular basis of Mendel's law of segregation."
+}, {
+  id: "z2_m6",
+  zone: 2,
+  difficulty: "medium",
+  type: "multiple_choice",
+  prompt: "In a three-point test cross, you score 1000 progeny: parental classes total 820, single recombinants in region 1 total 75, single recombinants in region 2 total 73, and double recombinants total 32. What is the OBSERVED recombination frequency between the two OUTER markers?",
+  options: ["3.2%", "14.8%", "18.0%", "21.2%"],
+  correct: "B",
+  explanation: "For the two outer markers, a chromatid with two crossovers (a double recombinant) ends up with the parental combination of the outer alleles — the second crossover cancels the first. So observed RF(outer markers) = (single₁ + single₂)/total = (75 + 73)/1000 = 14.8%. The TRUE map distance (sum of the two interval distances), which DOES count doubles twice, is (148 + 2×32)/1000 = 21.2% — but that's the corrected map distance, not the observed RF."
+},
+// Two more medium questions to round Zone 2 out
+{
+  id: "z2_m7",
+  zone: 2,
+  difficulty: "medium",
+  type: "multiple_choice",
+  prompt: "A male with hemophilia (X-linked recessive) marries a non-carrier woman. What is the probability that their daughter will be affected?",
+  options: ["0%", "25%", "50%", "100%"],
+  correct: "A",
+  explanation: "The father contributes his X^h to all daughters (making them carriers, X^H X^h), but the mother contributes only X^H. Daughters cannot be affected unless they inherit X^h from BOTH parents. All daughters from this cross will be unaffected carriers."
+}, {
+  id: "z2_m8",
+  zone: 2,
+  difficulty: "medium",
+  type: "matching",
+  prompt: "Match each chromosomal abnormality to its description:",
+  items: [{
+    left: "Deletion",
+    right: "A chromosomal segment is missing"
+  }, {
+    left: "Duplication",
+    right: "Two copies of a chromosomal segment present"
+  }, {
+    left: "Inversion",
+    right: "Adjacent gene order is reversed"
+  }, {
+    left: "Translocation",
+    right: "Segment moved to a non-homologous chromosome"
+  }],
+  explanation: "These are the four major structural chromosomal abnormalities. Small inversions and balanced translocations may have minimal phenotypic effect; deletions and duplications usually cause issues due to gene dosage imbalance."
+},
+// — Hard —
+{
+  id: "z2_h1",
+  zone: 2,
+  difficulty: "hard",
+  type: "stage_id",
+  prompt: "This image shows a cell with sister chromatids being pulled to opposite poles, but homologous pairs of chromosomes are NOT separately on opposite ends. The cell entered division with 4 chromosomes (2 pairs). What stage is this?",
+  spec: "mitosis_ana",
+  options: ["Mitotic anaphase", "Meiosis I anaphase", "Meiosis II anaphase", "Mitotic metaphase"],
+  correct: "A",
+  explanation: "Mitotic anaphase: sister chromatids separate; both poles receive a complete chromosome set including BOTH homologs. Contrast with meiosis I anaphase where homologs separate (sisters stay together) and meiosis II anaphase which would start with only half the chromosome number."
+}, {
+  id: "z2_h2",
+  zone: 2,
+  difficulty: "hard",
+  type: "multiple_choice",
+  prompt: "A three-point test cross between AaBbCc × aabbcc yields the following progeny (1000 total): ABC=410, abc=406, AbC=42, aBc=40, Abc=44, aBC=44, ABc=8, abC=6. Identify the gene order using the double-recombinant class.",
+  options: ["A-B-C", "A-C-B", "B-A-C", "Cannot be determined"],
+  correct: "B",
+  explanation: "Parentals (most common): ABC and abc. Double recombinants (rarest): ABc and abC. Compare a parental (ABC) with a double recombinant (ABc): only the third position (C↔c) flipped. The gene that flips relative to parental in the double recombinant class is the MIDDLE gene. So C is in the middle → gene order is A-C-B."
+}, {
+  id: "z2_h3",
+  zone: 2,
+  difficulty: "hard",
+  type: "error_id",
+  prompt: "A student says: \"In a three-point cross, I can ignore the double recombinant class — it's so rare that removing it won't affect my gene-order determination.\" Why is this wrong?",
+  options: ["The student is correct — double recombinants are too rare to matter", "Double recombinants are actually the most common class", "The double recombinant class is precisely what tells you which gene is in the MIDDLE; ignoring it makes gene-order determination impossible", "Gene order must be determined from parental classes only"],
+  correct: "C",
+  explanation: "The double recombinant class is the KEY to gene order. Compare it to the parental class: the single allele that has flipped relative to the parental combination identifies the middle gene. Without doubles, you can compute interval distances but not the order itself."
+}, {
+  id: "z2_h4",
+  zone: 2,
+  difficulty: "hard",
+  type: "stage_id",
+  prompt: "This dividing cell shows two homologs being separated, while sister chromatids remain joined (note the X-shapes at the poles). The parent cell had 4 chromosomes total. After this division completes, each daughter cell will have:",
+  spec: "meiosis_ana1",
+  options: ["4 chromosomes (no change)", "2 chromosomes, each as sister chromatids", "2 chromosomes, each as a single chromatid", "8 chromosomes"],
+  correct: "B",
+  explanation: "Anaphase I of meiosis halves chromosome number from 2n=4 to n=2, but each chromosome is still composed of two sister chromatids attached at the centromere — that's why the X-shapes persist at the poles. Sister chromatids will be separated later, in anaphase II."
+},
+// ══════════════════════════════════════════════════════════
+// ZONE 3 — BACTERIAL GENETICS & GENOMES
+// ══════════════════════════════════════════════════════════
+// — Easy —
+{
+  id: "z3_e1",
+  zone: 3,
+  difficulty: "easy",
+  type: "multiple_choice",
+  prompt: "Bacterial transformation is best defined as:",
+  options: ["DNA transfer via a bacteriophage", "Uptake of free DNA from the environment by a competent bacterium", "DNA transfer through direct cell-to-cell contact via a pilus", "Insertion of a plasmid into a chromosome"],
+  correct: "B",
+  explanation: "Transformation is the uptake and incorporation of free environmental DNA. Cells able to take up DNA are 'competent'. First demonstrated by Griffith (1928), molecularly explained by Avery, MacLeod & McCarty (1944)."
+}, {
+  id: "z3_e2",
+  zone: 3,
+  difficulty: "easy",
+  type: "true_false",
+  prompt: "In bacterial conjugation, the F⁺ cell is the donor that transfers DNA via a sex pilus to the F⁻ recipient.",
+  correct: "True",
+  explanation: "The F (fertility) plasmid encodes the sex pilus and transfer machinery. F⁺ donates; F⁻ receives. After conjugation between F⁺ × F⁻, both cells become F⁺."
+}, {
+  id: "z3_e3",
+  zone: 3,
+  difficulty: "easy",
+  type: "multiple_choice",
+  prompt: "What does 'Hfr' stand for in bacterial genetics?",
+  options: ["High-frequency replication", "Heterozygous fluorescent recombinant", "High-frequency recombination", "Homologous fragment recombination"],
+  correct: "C",
+  explanation: "Hfr = High Frequency of Recombination. Hfr strains have the F plasmid integrated into the bacterial chromosome and produce recombinants >1000× more frequently than F⁺ × F⁻ matings."
+}, {
+  id: "z3_e4",
+  zone: 3,
+  difficulty: "easy",
+  type: "multiple_choice",
+  prompt: "Which type of transduction can transfer ANY gene from the donor bacterial chromosome?",
+  options: ["Specialized transduction", "Generalized transduction", "Conjugational transduction", "Transformation"],
+  correct: "B",
+  explanation: "Generalized transduction occurs when phages package random pieces of bacterial DNA during lytic infection, so any gene can be transferred. Specialized transduction (from a lysogenic phage) only transfers genes adjacent to the phage integration site."
+}, {
+  id: "z3_e5",
+  zone: 3,
+  difficulty: "easy",
+  type: "true_false",
+  prompt: "Plasmids are circular DNA molecules that replicate independently of the bacterial chromosome.",
+  correct: "True",
+  explanation: "Plasmids are typically circular, double-stranded extrachromosomal DNA elements with their own origin of replication. They often carry accessory genes like antibiotic resistance."
+}, {
+  id: "z3_e6",
+  zone: 3,
+  difficulty: "easy",
+  type: "multiple_choice",
+  prompt: "Which of the following is an example of a repetitive sequence in eukaryotic genomes?",
+  options: ["Single-copy protein-coding genes", "Transposable elements", "16S rRNA in bacteria", "Plasmid origins of replication"],
+  correct: "B",
+  explanation: "Transposable elements (e.g., LINEs, SINEs, LTR retrotransposons in mammals) are major contributors to repetitive DNA. About half the human genome is derived from transposable elements."
+},
+// — Medium —
+{
+  id: "z3_m1",
+  zone: 3,
+  difficulty: "medium",
+  type: "matching",
+  prompt: "Match each bacterial DNA-transfer mechanism to its key feature:",
+  items: [{
+    left: "Transformation",
+    right: "Uptake of naked DNA from environment"
+  }, {
+    left: "Conjugation",
+    right: "Cell-to-cell contact via sex pilus"
+  }, {
+    left: "Transduction",
+    right: "DNA transfer via bacteriophage"
+  }, {
+    left: "Transposition",
+    right: "Movement of DNA elements within or between genomes"
+  }],
+  explanation: "These are the four main mechanisms of horizontal gene transfer in bacteria. Together they explain rapid spread of antibiotic resistance and other adaptive traits."
+}, {
+  id: "z3_m2",
+  zone: 3,
+  difficulty: "medium",
+  type: "gel_id",
+  prompt: "A 10-kb circular plasmid is digested with restriction enzyme EcoRI. The resulting gel pattern is shown. How many EcoRI sites does the plasmid contain?",
+  spec: {
+    lanes: [{
+      label: "EcoRI",
+      bands: [6, 4]
+    }],
+    ladder: [10, 8, 6, 5, 4, 3, 2, 1]
+  },
+  options: ["1 site", "2 sites", "3 sites", "4 sites"],
+  correct: "B",
+  explanation: "For a CIRCULAR DNA molecule, the number of restriction sites equals the number of fragments produced. Two bands (6 kb + 4 kb = 10 kb total ✓) means EcoRI cut twice → 2 sites."
+}, {
+  id: "z3_m3",
+  zone: 3,
+  difficulty: "medium",
+  type: "gel_id",
+  prompt: "The same 10-kb circular plasmid is digested separately with EcoRI, BamHI, and both together. Based on the gel pattern, how many BamHI sites does the plasmid have?",
+  spec: {
+    lanes: [{
+      label: "EcoRI",
+      bands: [6, 4]
+    }, {
+      label: "BamHI",
+      bands: [7, 3]
+    }, {
+      label: "E + B",
+      bands: [4, 3, 2, 1]
+    }],
+    ladder: [10, 8, 6, 5, 4, 3, 2, 1]
+  },
+  options: ["1 site", "2 sites", "3 sites", "4 sites"],
+  correct: "B",
+  explanation: "The BamHI lane shows 2 bands (7 + 3 = 10 kb) for a circular molecule → 2 BamHI sites. The double digest produces 4 fragments because there are 2 + 2 = 4 cuts total around the circle."
+}, {
+  id: "z3_m4",
+  zone: 3,
+  difficulty: "medium",
+  type: "true_false",
+  prompt: "In a Hardy-Weinberg-style situation, plasmid-borne antibiotic resistance genes are unaffected by horizontal gene transfer.",
+  correct: "False",
+  explanation: "Horizontal gene transfer is exactly the mechanism that spreads plasmid-borne resistance between bacterial species and strains, dramatically affecting allele frequencies in bacterial populations and confounding any 'vertical-only' inheritance models."
+},
+// — Hard —
+{
+  id: "z3_h1",
+  zone: 3,
+  difficulty: "hard",
+  type: "gel_id",
+  prompt: "Three suspects (S1, S2, S3) and a crime-scene sample (CS) were typed at one STR locus by gel electrophoresis. Which suspect's DNA matches the crime scene?",
+  spec: {
+    lanes: [{
+      label: "CS",
+      bands: [4, 3]
+    }, {
+      label: "S1",
+      bands: [5, 4]
+    }, {
+      label: "S2",
+      bands: [4, 3]
+    }, {
+      label: "S3",
+      bands: [6, 3]
+    }],
+    ladder: [8, 6, 5, 4, 3, 2]
+  },
+  options: ["S1", "S2", "S3", "Cannot determine"],
+  correct: "B",
+  explanation: "DNA matching at an STR locus requires identical band patterns. The crime-scene sample shows bands at 4 kb and 3 kb. S2 shows the same pattern; S1 (5/4) and S3 (6/3) do not match. (In real forensics, multiple loci would be needed for confident identification.)"
+}, {
+  id: "z3_h2",
+  zone: 3,
+  difficulty: "hard",
+  type: "multiple_choice",
+  prompt: "In an interrupted-mating experiment with E. coli, an Hfr strain transfers genes in this order over time: leu (5 min), thr (10 min), pro (15 min), trp (25 min). What does this tell us?",
+  options: ["leu is the rarest gene transferred", "These genes are transferred in linear order from the F-plasmid integration site, with leu closest and trp farthest", "All four genes are on plasmids", "trp is most likely to be transferred"],
+  correct: "B",
+  explanation: "Interrupted-mating experiments reveal gene order on the bacterial chromosome. Genes transferred earliest are closest to the F-plasmid integration site (the origin of transfer); the longer the mating proceeds, the further genes get transferred. This allowed Wollman & Jacob to map the E. coli chromosome."
+},
+// ══════════════════════════════════════════════════════════
+// ZONE 4 — MOLECULAR GENETICS
+// ══════════════════════════════════════════════════════════
+// — Easy —
+{
+  id: "z4_e1",
+  zone: 4,
+  difficulty: "easy",
+  type: "multiple_choice",
+  prompt: "DNA replication is described as 'semiconservative' because:",
+  options: ["Each daughter molecule contains one parental and one new strand", "Both strands of each daughter molecule are newly synthesized", "Replication conserves the original DNA molecule entirely", "Half of each new strand is RNA"],
+  correct: "A",
+  explanation: "Meselson & Stahl (1958) demonstrated semiconservative replication: each new double helix consists of one parental (template) strand and one newly synthesized strand."
+}, {
+  id: "z4_e2",
+  zone: 4,
+  difficulty: "easy",
+  type: "true_false",
+  prompt: "DNA polymerase synthesizes DNA in the 5' to 3' direction.",
+  correct: "True",
+  explanation: "All DNA polymerases add nucleotides to the 3' OH end of the growing strand, so synthesis proceeds 5'→3'. The template is read in the opposite direction (3'→5')."
+}, {
+  id: "z4_e3",
+  zone: 4,
+  difficulty: "easy",
+  type: "multiple_choice",
+  prompt: "Which of the following is NOT a step in protein synthesis?",
+  options: ["Transcription of DNA to mRNA", "Splicing out of introns from pre-mRNA", "Reverse transcription of mRNA", "Translation of mRNA to polypeptide"],
+  correct: "C",
+  explanation: "Reverse transcription (RNA → DNA) is performed by retroviruses and some transposable elements, but is NOT a step in normal cellular protein synthesis."
+}, {
+  id: "z4_e4",
+  zone: 4,
+  difficulty: "easy",
+  type: "multiple_choice",
+  prompt: "The genetic code is described as 'degenerate.' What does this mean?",
+  options: ["Some codons are no longer functional", "Multiple codons can encode the same amino acid", "The code is gradually being lost over evolutionary time", "Codons can be read in either direction"],
+  correct: "B",
+  explanation: "61 codons encode 20 amino acids, so most amino acids are specified by multiple synonymous codons. Synonymous codons usually differ at the third position (the 'wobble' position)."
+}, {
+  id: "z4_e5",
+  zone: 4,
+  difficulty: "easy",
+  type: "true_false",
+  prompt: "A nonsense mutation creates a premature stop codon, truncating the protein.",
+  correct: "True",
+  explanation: "Nonsense mutations change a codon from one specifying an amino acid to a stop codon (UAA, UAG, or UGA), causing premature termination of translation and producing a truncated, usually non-functional protein."
+},
+// — Medium —
+{
+  id: "z4_m1",
+  zone: 4,
+  difficulty: "medium",
+  type: "codon_translate",
+  prompt: "Translate the following mRNA segment into amino acids (using the standard genetic code, reading 5'→3'):",
+  mrna: "AUGUCCGAGUAA",
+  options: ["Met-Ser-Glu-STOP", "Met-Pro-Glu-STOP", "Met-Ser-Asp-Trp", "Met-Thr-Glu-STOP"],
+  correct: "A",
+  explanation: "Codons: AUG (Met/M, start) — UCC (Ser/S) — GAG (Glu/E) — UAA (STOP). The mRNA encodes a 3-amino-acid peptide: Met-Ser-Glu, then translation terminates."
+}, {
+  id: "z4_m2",
+  zone: 4,
+  difficulty: "medium",
+  type: "codon_translate",
+  prompt: "A wild-type mRNA codon UUU encodes Phenylalanine (Phe, F). A point mutation changes it to UGU. What is the consequence?",
+  mrna: "UUU→UGU",
+  options: ["Silent mutation: still encodes Phe", "Missense mutation: encodes Cysteine (Cys, C) instead of Phe", "Nonsense mutation: produces a premature stop codon", "Frameshift mutation: shifts reading frame"],
+  correct: "B",
+  explanation: "UGU encodes Cysteine. The mutation changes one amino acid (Phe → Cys) without disrupting the reading frame — this is a missense mutation. (This actual mutation is the F508C variant in CFTR cystic fibrosis gene.)"
+}, {
+  id: "z4_m3",
+  zone: 4,
+  difficulty: "medium",
+  type: "codon_translate",
+  prompt: "What kind of mutation is shown? Wild-type DNA: ATGCCAGTC → Mutant DNA: ATGCAGTC",
+  options: ["Point mutation (substitution)", "Insertion of one base", "Deletion of one base — a frameshift", "Silent mutation"],
+  correct: "C",
+  explanation: "The mutant is one base shorter: 'CCA' became 'CA' (a C was deleted). Single-base deletions in coding sequence cause a frameshift, scrambling all downstream codons."
+}, {
+  id: "z4_m4",
+  zone: 4,
+  difficulty: "medium",
+  type: "ordering",
+  prompt: "Place these eukaryotic gene-expression steps in correct temporal order:",
+  items: ["Transcription initiation", "5' capping & 3' polyadenylation", "RNA splicing", "Export from nucleus", "Translation"],
+  explanation: "Eukaryotic mRNA processing: transcription begins → 5' cap added co-transcriptionally → splicing of introns → polyadenylation at 3' end → mature mRNA exported through nuclear pores → translation in cytoplasm."
+},
+// — Hard —
+{
+  id: "z4_h1",
+  zone: 4,
+  difficulty: "hard",
+  type: "codon_translate",
+  prompt: "You sequence a gene and find this mutation in the coding region: wild-type 'AAGCCT' → mutant 'AAGCT'. Translation begins at a Met codon upstream. What is the most likely consequence?",
+  options: ["A silent mutation (no change to protein)", "A single amino-acid substitution", "A frameshift, with all downstream codons changed and likely a premature stop", "A duplication of one codon"],
+  correct: "C",
+  explanation: "A single C was deleted ('AAGCCT' → 'AAGCT' — 6 → 5 bases). Single-base deletions cause frameshifts: every codon after the deletion is read in a new frame, usually generating an unrelated amino acid sequence and a premature stop codon. The protein is severely truncated and non-functional."
+}, {
+  id: "z4_h2",
+  zone: 4,
+  difficulty: "hard",
+  type: "error_id",
+  prompt: "A student says: \"A silent mutation has no effect on the organism.\" Why is this oversimplification?",
+  options: ["Silent mutations are actually always harmful", "Silent mutations DO change protein sequence", "While silent mutations don't change the amino acid encoded, they can affect mRNA stability, splicing efficiency, or translation rate due to codon bias — so they CAN have phenotypic consequences", "Silent mutations only occur in non-coding regions"],
+  correct: "C",
+  explanation: "Silent (synonymous) mutations don't change the amino acid sequence, but they CAN affect: mRNA secondary structure, mRNA stability, splice-site recognition, and translation rate (because of differential tRNA abundances/codon bias). 'Silent' is a misnomer — synonymous mutations have measurable effects in many contexts."
+},
+// ══════════════════════════════════════════════════════════
+// ZONE 5 — EVOLUTION & POPULATION GENETICS
+// ══════════════════════════════════════════════════════════
+// — Easy —
+{
+  id: "z5_e1",
+  zone: 5,
+  difficulty: "easy",
+  type: "multiple_choice",
+  prompt: "Hardy-Weinberg equilibrium predicts allele and genotype frequencies in a population that:",
+  options: ["Is undergoing strong selection", "Is large, randomly mating, with no migration, mutation, or selection", "Has just experienced a bottleneck", "Is small with high inbreeding"],
+  correct: "B",
+  explanation: "H-W equilibrium requires: large N, random mating, no migration, no mutation, and no selection. When these conditions hold, allele and genotype frequencies remain constant across generations."
+}, {
+  id: "z5_e2",
+  zone: 5,
+  difficulty: "easy",
+  type: "true_false",
+  prompt: "In a Hardy-Weinberg population with allele frequencies p (for A) and q (for a), the genotype frequency of heterozygotes is 2pq.",
+  correct: "True",
+  explanation: "Hardy-Weinberg genotype frequencies: p² (AA), 2pq (Aa), q² (aa). The factor of 2 reflects that heterozygotes can form as either A-egg/a-sperm OR a-egg/A-sperm."
+}, {
+  id: "z5_e3",
+  zone: 5,
+  difficulty: "easy",
+  type: "multiple_choice",
+  prompt: "Which of the following is most likely to cause large random changes in allele frequency in a small population?",
+  options: ["Natural selection", "Genetic drift", "Gene flow", "Mutation"],
+  correct: "B",
+  explanation: "Genetic drift — random sampling effects between generations — has the largest effect in small populations. Its impact decreases as population size increases (∝ 1/N)."
+}, {
+  id: "z5_e4",
+  zone: 5,
+  difficulty: "easy",
+  type: "multiple_choice",
+  prompt: "In a population at Hardy-Weinberg equilibrium, the frequency of homozygous recessive individuals (q²) is 0.04. What is the frequency of the recessive allele (q)?",
+  options: ["0.02", "0.16", "0.20", "0.96"],
+  correct: "C",
+  explanation: "q² = 0.04, so q = √0.04 = 0.20. The recessive allele frequency is 20%."
+}, {
+  id: "z5_e5",
+  zone: 5,
+  difficulty: "easy",
+  type: "true_false",
+  prompt: "FST measures the degree of genetic differentiation between subpopulations.",
+  correct: "True",
+  explanation: "FST ranges from 0 (no differentiation; populations are panmictic) to 1 (complete differentiation; populations share no alleles). It's used widely in population genetics and conservation biology."
+},
+// — Medium —
+{
+  id: "z5_m1",
+  zone: 5,
+  difficulty: "medium",
+  type: "multiple_choice",
+  prompt: "In a Hardy-Weinberg population, q² = 0.04 (homozygous recessive). What proportion of the population are heterozygous carriers?",
+  options: ["0.04", "0.16", "0.32", "0.40"],
+  correct: "C",
+  explanation: "q = 0.20, so p = 0.80. Heterozygotes = 2pq = 2(0.80)(0.20) = 0.32, or 32%. Note that even when only 4% of people are affected, 32% are carriers — a much larger reservoir."
+}, {
+  id: "z5_m2",
+  zone: 5,
+  difficulty: "medium",
+  type: "matching",
+  prompt: "Match each evolutionary force to its primary effect on within-population genetic variation:",
+  items: [{
+    left: "Natural selection (directional)",
+    right: "Reduces variation by favoring one allele"
+  }, {
+    left: "Mutation",
+    right: "Generates new genetic variation"
+  }, {
+    left: "Genetic drift",
+    right: "Random loss of alleles, especially in small populations"
+  }, {
+    left: "Gene flow (migration)",
+    right: "Homogenizes allele frequencies between populations"
+  }],
+  explanation: "These four forces (plus non-random mating) shape allele frequencies. Mutation creates variation, drift erodes it, selection sorts it, and gene flow redistributes it among populations."
+}, {
+  id: "z5_m3",
+  zone: 5,
+  difficulty: "medium",
+  type: "true_false",
+  prompt: "Two populations with high gene flow between them will tend to have low FST values.",
+  correct: "True",
+  explanation: "Gene flow (migration) homogenizes allele frequencies between populations, reducing differentiation. High gene flow → low FST. Low gene flow allows drift and local selection to drive populations apart, increasing FST."
+}, {
+  id: "z5_m4",
+  zone: 5,
+  difficulty: "medium",
+  type: "multiple_choice",
+  prompt: "A population of 1000 individuals is reduced to 10 surviving individuals due to a hurricane. Allele frequencies in the survivors differ substantially from the original population. This is best described as:",
+  options: ["Natural selection", "A founder effect", "A bottleneck effect", "Adaptive radiation"],
+  correct: "C",
+  explanation: "A bottleneck is a sharp reduction in population size that leaves the survivors as a non-random sample of the original population, often with reduced genetic variation. Founder effect refers specifically to a small group COLONIZING a new area."
+},
+// — Hard —
+{
+  id: "z5_h1",
+  zone: 5,
+  difficulty: "hard",
+  type: "multiple_choice",
+  prompt: "A recessive disease has a frequency of 1 in 10,000 newborns. Assuming Hardy-Weinberg, what fraction of the general population are heterozygous carriers?",
+  options: ["1 in 50", "1 in 100", "1 in 500", "1 in 5,000"],
+  correct: "A",
+  explanation: "q² = 1/10,000, so q = 1/100 = 0.01. p ≈ 1. Carrier frequency = 2pq ≈ 2(1)(0.01) = 0.02, or about 1 in 50. This 'carrier load' is much higher than the affected frequency — a key insight for genetic counseling."
+}, {
+  id: "z5_h2",
+  zone: 5,
+  difficulty: "hard",
+  type: "error_id",
+  prompt: "A student says: \"If a population is at Hardy-Weinberg equilibrium for a particular gene, then it must be at HWE for ALL its genes.\" What's wrong with this?",
+  options: ["The student is correct", "Hardy-Weinberg only applies to one gene at a time. Different loci can be under different selective pressures, mutation rates, or linkage effects, and may not all be at HWE simultaneously", "Hardy-Weinberg never applies to real populations", "Only sex-linked genes can be at HWE"],
+  correct: "B",
+  explanation: "HWE is an equilibrium AT A SINGLE LOCUS. A population can be at HWE for some genes but not others, depending on which forces act on each locus. Even within the genome, selection, mutation, drift, and migration affect different genes differently."
+}, {
+  id: "z5_h3",
+  zone: 5,
+  difficulty: "hard",
+  type: "multiple_choice",
+  prompt: "In sickle-cell anemia in malaria-endemic regions, the heterozygote (AS) has higher fitness than either homozygote (AA, susceptible to malaria; SS, severe anemia). This is an example of:",
+  options: ["Directional selection", "Disruptive selection", "Heterozygote advantage (overdominance / balancing selection)", "Negative frequency-dependent selection"],
+  correct: "C",
+  explanation: "Heterozygote advantage maintains both alleles in the population at a stable equilibrium, even though one homozygote (SS) is severely deleterious. This is a classic example of balancing selection."
+}];
+
+// ── Question helpers ─────────────────────────────────────────
+const byZoneAndDifficulty = (zone, diff) => QUESTIONS.filter(q => q.zone === zone && q.difficulty === diff);
+const randomQuestion = (zone, diff, usedIds) => {
+  const fullPool = byZoneAndDifficulty(zone, diff);
+  if (fullPool.length === 0) {
+    // Fallback: any question from that zone
+    const zonePool = QUESTIONS.filter(q => q.zone === zone);
+    if (zonePool.length === 0) return QUESTIONS[Math.floor(Math.random() * QUESTIONS.length)];
+    return zonePool[Math.floor(Math.random() * zonePool.length)];
+  }
+  const fresh = fullPool.filter(q => !usedIds.has(q.id));
+  if (fresh.length === 0) {
+    // All used, pick any from full pool
+    return fullPool[Math.floor(Math.random() * fullPool.length)];
+  }
+  return fresh[Math.floor(Math.random() * fresh.length)];
+};
+
+// ════════════════════════════════════════════════════════════
+// QUESTION-TYPE COMPONENTS
+// ════════════════════════════════════════════════════════════
+
+function MCQuestion({
+  question,
+  onAnswer
+}) {
+  const [selected, setSelected] = useState(null);
+  const opts = ["A", "B", "C", "D", "E", "F"];
+  return /*#__PURE__*/React.createElement("div", {
+    className: "space-y-2"
+  }, question.options.map((opt, i) => {
+    const letter = opts[i];
+    const isSelected = selected === letter;
+    const isCorrect = letter === question.correct;
+    return /*#__PURE__*/React.createElement("button", {
+      key: i,
+      onClick: () => {
+        if (!selected) {
+          setSelected(letter);
+          onAnswer(letter === question.correct);
+        }
+      },
+      className: `w-full text-left p-3 rounded-xl border-2 text-sm transition-all ${!selected ? "border-gray-200 bg-white hover:border-blue-300 hover:bg-blue-50 active:scale-95" : isSelected && isCorrect ? "border-green-500 bg-green-50 text-green-800" : isSelected ? "border-red-500 bg-red-50 text-red-800" : isCorrect ? "border-green-400 bg-green-50 text-green-700" : "border-gray-200 bg-gray-50 text-gray-400"}`
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "font-bold mr-2"
+    }, letter, "."), opt);
+  }));
+}
+function TFQuestion({
+  question,
+  onAnswer
+}) {
+  const [selected, setSelected] = useState(null);
+  return /*#__PURE__*/React.createElement("div", {
+    className: "flex gap-3"
+  }, ["True", "False"].map(tf => {
+    const correct = question.correct === tf;
+    const isSelected = selected === tf;
+    return /*#__PURE__*/React.createElement("button", {
+      key: tf,
+      onClick: () => {
+        if (!selected) {
+          setSelected(tf);
+          onAnswer(correct);
+        }
+      },
+      className: `flex-1 py-4 rounded-xl border-2 font-bold text-lg transition-all ${!selected ? "border-gray-200 bg-white hover:bg-blue-50 hover:border-blue-300 active:scale-95" : isSelected && correct ? "border-green-500 bg-green-100 text-green-800" : isSelected ? "border-red-500 bg-red-100 text-red-800" : correct ? "border-green-400 bg-green-50 text-green-700" : "border-gray-200 bg-gray-50 text-gray-400"}`
+    }, tf);
+  }));
+}
+function MatchingQuestion({
+  question,
+  onAnswer
+}) {
+  // Drag-free matching: shuffle "right" sides, user picks the right answer for each "left"
+  const [shuffledRights] = useState(() => {
+    const rights = question.items.map(it => it.right);
+    return [...rights].sort(() => Math.random() - 0.5);
+  });
+  const [matches, setMatches] = useState({});
+  const [submitted, setSubmitted] = useState(false);
+  const handleSelect = (leftIdx, right) => {
+    if (submitted) return;
+    setMatches(m => ({
+      ...m,
+      [leftIdx]: right
+    }));
+  };
+  const handleSubmit = () => {
+    if (submitted) return;
+    const allMatched = question.items.every((_, i) => matches[i]);
+    if (!allMatched) return;
+    setSubmitted(true);
+    const allCorrect = question.items.every((it, i) => matches[i] === it.right);
+    onAnswer(allCorrect);
+  };
+  const ready = question.items.every((_, i) => matches[i]);
+  return /*#__PURE__*/React.createElement("div", {
+    className: "space-y-3"
+  }, question.items.map((it, i) => {
+    const chosen = matches[i];
+    const correct = it.right;
+    const isCorrect = chosen === correct;
+    return /*#__PURE__*/React.createElement("div", {
+      key: i,
+      className: `p-3 rounded-xl border-2 ${!submitted ? "border-gray-200 bg-white" : isCorrect ? "border-green-400 bg-green-50" : "border-red-400 bg-red-50"}`
+    }, /*#__PURE__*/React.createElement("p", {
+      className: "font-bold text-sm mb-2"
+    }, it.left), /*#__PURE__*/React.createElement("select", {
+      value: chosen || "",
+      onChange: e => handleSelect(i, e.target.value),
+      disabled: submitted,
+      className: "w-full p-2 border-2 border-gray-200 rounded-lg text-sm bg-white"
+    }, /*#__PURE__*/React.createElement("option", {
+      value: ""
+    }, "\u2014 choose \u2014"), shuffledRights.map((r, j) => /*#__PURE__*/React.createElement("option", {
+      key: j,
+      value: r
+    }, r))), submitted && !isCorrect && /*#__PURE__*/React.createElement("p", {
+      className: "text-xs text-green-700 mt-2"
+    }, "\u2713 Correct: ", correct));
+  }), !submitted && /*#__PURE__*/React.createElement("button", {
+    onClick: handleSubmit,
+    disabled: !ready,
+    className: `w-full py-3 rounded-xl font-bold text-white transition-all ${ready ? "bg-blue-600 hover:bg-blue-700" : "bg-gray-300 cursor-not-allowed"}`
+  }, "Submit Matches"));
+}
+function OrderingQuestion({
+  question,
+  onAnswer
+}) {
+  const [shuffled, setShuffled] = useState(() => [...question.items].sort(() => Math.random() - 0.5));
+  const [submitted, setSubmitted] = useState(false);
+  const moveUp = i => {
+    if (submitted || i === 0) return;
+    setShuffled(arr => {
+      const next = [...arr];
+      [next[i - 1], next[i]] = [next[i], next[i - 1]];
+      return next;
+    });
+  };
+  const moveDown = i => {
+    if (submitted || i === shuffled.length - 1) return;
+    setShuffled(arr => {
+      const next = [...arr];
+      [next[i + 1], next[i]] = [next[i], next[i + 1]];
+      return next;
+    });
+  };
+  const handleSubmit = () => {
+    if (submitted) return;
+    setSubmitted(true);
+    const isCorrect = shuffled.every((it, i) => it === question.items[i]);
+    onAnswer(isCorrect);
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    className: "space-y-2"
+  }, shuffled.map((it, i) => {
+    const correctPos = question.items.indexOf(it);
+    const inRightPlace = correctPos === i;
+    return /*#__PURE__*/React.createElement("div", {
+      key: it,
+      className: `flex items-center gap-2 p-3 rounded-xl border-2 ${!submitted ? "border-gray-200 bg-white" : inRightPlace ? "border-green-400 bg-green-50" : "border-red-400 bg-red-50"}`
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "font-bold text-gray-400 w-6"
+    }, i + 1, "."), /*#__PURE__*/React.createElement("span", {
+      className: "flex-1 text-sm"
+    }, it), !submitted && /*#__PURE__*/React.createElement("div", {
+      className: "flex gap-1"
+    }, /*#__PURE__*/React.createElement("button", {
+      onClick: () => moveUp(i),
+      disabled: i === 0,
+      className: "px-2 py-1 bg-gray-100 rounded hover:bg-gray-200 disabled:opacity-30 text-xs"
+    }, "\u25B2"), /*#__PURE__*/React.createElement("button", {
+      onClick: () => moveDown(i),
+      disabled: i === shuffled.length - 1,
+      className: "px-2 py-1 bg-gray-100 rounded hover:bg-gray-200 disabled:opacity-30 text-xs"
+    }, "\u25BC")), submitted && !inRightPlace && /*#__PURE__*/React.createElement("span", {
+      className: "text-xs text-green-700"
+    }, "\u2192 slot ", correctPos + 1));
+  }), !submitted && /*#__PURE__*/React.createElement("button", {
+    onClick: handleSubmit,
+    className: "w-full py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-all"
+  }, "Submit Order"));
+}
+function PunnettQuestion({
+  question,
+  onAnswer
+}) {
+  // For the simpler version, render as MC
+  return /*#__PURE__*/React.createElement(MCQuestion, {
+    question: question,
+    onAnswer: onAnswer
+  });
+}
+function ErrorIDQuestion({
+  question,
+  onAnswer
+}) {
+  return /*#__PURE__*/React.createElement(MCQuestion, {
+    question: question,
+    onAnswer: onAnswer
+  });
+}
+
+// New visual question types — each shows the SVG, then offers MC answers
+function VisualQuestion({
+  question,
+  onAnswer,
+  SvgComponent,
+  svgProps
+}) {
+  return /*#__PURE__*/React.createElement("div", {
+    className: "space-y-3"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "bg-white rounded-xl p-2 border border-gray-200 overflow-hidden"
+  }, /*#__PURE__*/React.createElement(SvgComponent, svgProps)), /*#__PURE__*/React.createElement(MCQuestion, {
+    question: question,
+    onAnswer: onAnswer
+  }));
+}
+function PedigreeQuestion({
+  question,
+  onAnswer
+}) {
+  return /*#__PURE__*/React.createElement(VisualQuestion, {
+    question: question,
+    onAnswer: onAnswer,
+    SvgComponent: PedigreeSVG,
+    svgProps: {
+      spec: question.spec
+    }
+  });
+}
+function KaryotypeQuestion({
+  question,
+  onAnswer
+}) {
+  return /*#__PURE__*/React.createElement(VisualQuestion, {
+    question: question,
+    onAnswer: onAnswer,
+    SvgComponent: KaryotypeSVG,
+    svgProps: {
+      spec: question.spec
+    }
+  });
+}
+function StageQuestion({
+  question,
+  onAnswer
+}) {
+  return /*#__PURE__*/React.createElement(VisualQuestion, {
+    question: question,
+    onAnswer: onAnswer,
+    SvgComponent: CellStageSVG,
+    svgProps: {
+      stage: question.spec
+    }
+  });
+}
+function GelQuestion({
+  question,
+  onAnswer
+}) {
+  return /*#__PURE__*/React.createElement(VisualQuestion, {
+    question: question,
+    onAnswer: onAnswer,
+    SvgComponent: GelSVG,
+    svgProps: question.spec
+  });
+}
+function CodonQuestion({
+  question,
+  onAnswer
+}) {
+  // Show DNA/mRNA, then MC
+  const protein = null; // we don't display amino acids alongside the question
+  return /*#__PURE__*/React.createElement("div", {
+    className: "space-y-3"
+  }, question.mrna && question.mrna.length < 30 && !question.mrna.includes("→") && /*#__PURE__*/React.createElement("div", {
+    className: "bg-white rounded-xl p-2 border border-gray-200"
+  }, /*#__PURE__*/React.createElement(SequenceSVG, {
+    mrna: question.mrna
+  })), question.mrna && question.mrna.includes("→") && /*#__PURE__*/React.createElement("div", {
+    className: "bg-yellow-50 rounded-xl p-3 border border-yellow-200 text-center font-mono"
+  }, question.mrna), /*#__PURE__*/React.createElement(MCQuestion, {
+    question: question,
+    onAnswer: onAnswer
+  }));
+}
+
+// ── Question display dispatcher ──────────────────────────────
+function QuestionDisplay({
+  question,
+  onAnswer
+}) {
+  const [answered, setAnswered] = useState(null);
+  const handleAnswer = isCorrect => {
+    setAnswered(isCorrect);
+    if (isCorrect) {
+      // Correct: brief celebration then auto-advance
+      setTimeout(() => onAnswer(isCorrect), 1500);
+    }
+    // Wrong: wait for student to click "Continue" — gives them time to read the explanation
+  };
+  const handleContinue = () => onAnswer(false);
+  const zone = getZone(question.zone);
+  const diffColor = question.difficulty === "easy" ? "text-green-700 bg-green-100" : question.difficulty === "medium" ? "text-orange-700 bg-orange-100" : "text-red-700 bg-red-100";
+  const typeLabel = {
+    multiple_choice: "Multiple Choice",
+    true_false: "True / False",
+    matching: "Matching",
+    ordering: "Sequence",
+    punnett: "Punnett",
+    error_id: "Find the Error",
+    pedigree_id: "📊 Pedigree",
+    karyotype_id: "🧬 Karyotype",
+    stage_id: "🔬 Cell Stage",
+    gel_id: "🧪 Gel",
+    codon_translate: "⚗️ Codon"
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    className: "space-y-3"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-1.5 flex-wrap"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: `px-2 py-1 rounded-full text-xs font-bold ${zone.header} text-white`
+  }, zone.emoji, " ", zone.short), /*#__PURE__*/React.createElement("span", {
+    className: `px-2 py-1 rounded-full text-xs font-bold ${diffColor}`
+  }, question.difficulty.charAt(0).toUpperCase() + question.difficulty.slice(1)), /*#__PURE__*/React.createElement("span", {
+    className: "px-2 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-700"
+  }, typeLabel[question.type] || question.type)), /*#__PURE__*/React.createElement("p", {
+    className: "text-sm font-medium leading-relaxed whitespace-pre-line"
+  }, question.prompt), /*#__PURE__*/React.createElement("div", null, question.type === "multiple_choice" && /*#__PURE__*/React.createElement(MCQuestion, {
+    question: question,
+    onAnswer: handleAnswer,
+    key: question.id
+  }), question.type === "true_false" && /*#__PURE__*/React.createElement(TFQuestion, {
+    question: question,
+    onAnswer: handleAnswer,
+    key: question.id
+  }), question.type === "matching" && /*#__PURE__*/React.createElement(MatchingQuestion, {
+    question: question,
+    onAnswer: handleAnswer,
+    key: question.id
+  }), question.type === "ordering" && /*#__PURE__*/React.createElement(OrderingQuestion, {
+    question: question,
+    onAnswer: handleAnswer,
+    key: question.id
+  }), question.type === "punnett" && /*#__PURE__*/React.createElement(PunnettQuestion, {
+    question: question,
+    onAnswer: handleAnswer,
+    key: question.id
+  }), question.type === "error_id" && /*#__PURE__*/React.createElement(ErrorIDQuestion, {
+    question: question,
+    onAnswer: handleAnswer,
+    key: question.id
+  }), question.type === "pedigree_id" && /*#__PURE__*/React.createElement(PedigreeQuestion, {
+    question: question,
+    onAnswer: handleAnswer,
+    key: question.id
+  }), question.type === "karyotype_id" && /*#__PURE__*/React.createElement(KaryotypeQuestion, {
+    question: question,
+    onAnswer: handleAnswer,
+    key: question.id
+  }), question.type === "stage_id" && /*#__PURE__*/React.createElement(StageQuestion, {
+    question: question,
+    onAnswer: handleAnswer,
+    key: question.id
+  }), question.type === "gel_id" && /*#__PURE__*/React.createElement(GelQuestion, {
+    question: question,
+    onAnswer: handleAnswer,
+    key: question.id
+  }), question.type === "codon_translate" && /*#__PURE__*/React.createElement(CodonQuestion, {
+    question: question,
+    onAnswer: handleAnswer,
+    key: question.id
+  })), answered !== null && /*#__PURE__*/React.createElement("div", {
+    className: `p-3 rounded-xl border-2 text-sm leading-relaxed ${answered ? "border-green-400 bg-green-50 text-green-900" : "border-red-400 bg-red-50 text-red-900"}`
+  }, /*#__PURE__*/React.createElement("p", {
+    className: "font-bold mb-1"
+  }, answered ? "✓ Correct!" : "✗ Not quite"), /*#__PURE__*/React.createElement("p", {
+    className: "text-xs leading-relaxed"
+  }, question.explanation), !answered && /*#__PURE__*/React.createElement("button", {
+    onClick: handleContinue,
+    className: "mt-3 w-full py-2.5 bg-red-600 text-white rounded-xl font-bold text-sm hover:bg-red-700 transition-all active:scale-95"
+  }, "I've read the explanation \u2014 Continue \u2192")));
+}
+
+// ════════════════════════════════════════════════════════════
+// BOARD (multiplayer)
+// ════════════════════════════════════════════════════════════
+function Board({
+  players
+}) {
+  const spaces = [];
+  for (let i = 1; i <= 30; i++) {
+    spaces.push(i);
+  }
+  // 6 spaces per row × 5 rows, snake layout
+  const rows = [];
+  for (let r = 0; r < 5; r++) {
+    const row = spaces.slice(r * 6, (r + 1) * 6);
+    rows.push(r % 2 === 1 ? [...row].reverse() : row);
+  }
+  return /*#__PURE__*/React.createElement("div", {
+    className: "bg-white rounded-2xl p-3 border-2 border-gray-200 space-y-1"
+  }, rows.map((row, ri) => /*#__PURE__*/React.createElement("div", {
+    key: ri,
+    className: "grid grid-cols-6 gap-1"
+  }, row.map(space => {
+    const z = getZone(zoneOf(space));
+    const playersHere = players.filter(p => p.position === space);
+    const isStart = space === 1;
+    const isEnd = space === 30;
+    return /*#__PURE__*/React.createElement("div", {
+      key: space,
+      className: `relative aspect-square rounded-lg flex items-center justify-center text-xs font-bold ${z.bg} ${z.text} border ${z.border}`
+    }, isStart && /*#__PURE__*/React.createElement("span", {
+      className: "absolute -top-2 left-0.5 text-xs"
+    }, "\uD83C\uDFC1"), isEnd && /*#__PURE__*/React.createElement("span", {
+      className: "absolute -top-2 right-0.5 text-xs"
+    }, "\u2B50"), /*#__PURE__*/React.createElement("span", {
+      className: "opacity-70"
+    }, space), /*#__PURE__*/React.createElement("div", {
+      className: "absolute -top-1 -right-1 flex flex-wrap max-w-[20px]"
+    }, playersHere.map(p => /*#__PURE__*/React.createElement("div", {
+      key: p.id,
+      className: `w-3 h-3 rounded-full border border-white ${PCOLORS[p.colorIdx].bg}`
+    }))));
+  }))), /*#__PURE__*/React.createElement("div", {
+    className: "flex flex-wrap gap-1 mt-2 justify-center"
+  }, ZONES.map(z => /*#__PURE__*/React.createElement("div", {
+    key: z.id,
+    className: `flex items-center gap-1 px-2 py-0.5 rounded-full text-xs ${z.bg} ${z.text} border ${z.border}`
+  }, /*#__PURE__*/React.createElement("span", null, z.emoji), /*#__PURE__*/React.createElement("span", {
+    className: "font-medium"
+  }, z.short)))));
+}
+
+// ════════════════════════════════════════════════════════════
+// MULTIPLAYER GAME — all hooks at top, single-source-of-truth state
+// ════════════════════════════════════════════════════════════
+function MultiplayerGame() {
+  // ALL HOOKS AT TOP — this fixes the v1 bug where useState was inside a conditional.
+  const [playerCount, setPlayerCount] = useState(null);
+  const [names, setNames] = useState(["", "", "", ""]);
+  const [players, setPlayers] = useState([]);
+  const [setupDone, setSetupDone] = useState(false);
+  const [currentPlayerIdx, setCurrentPlayerIdx] = useState(0);
+  const [phase, setPhase] = useState("selectDifficulty"); // selectDifficulty | question | doubleOrNothing | donq | result | gameOver
+  const [currentQ, setCurrentQ] = useState(null);
+  const [donQuestion, setDonQuestion] = useState(null);
+  const [spacesEarned, setSpacesEarned] = useState(0);
+  const [usedIds] = useState(() => new Set());
+  const [lastResult, setLastResult] = useState(null);
+  const [showBoard, setShowBoard] = useState(true);
+  const diffMap = {
+    easy: 1,
+    medium: 2,
+    hard: 3
+  };
+
+  // Compute current player's zone (only meaningful after setup)
+  const currentPlayer = players[currentPlayerIdx] || {};
+  const playerPos = Math.max(1, currentPlayer.position || 1);
+  const currentZoneId = zoneOf(playerPos);
+  const currentZone = getZone(currentZoneId);
+  const movePlayer = useCallback(spaces => {
+    setPlayers(prev => prev.map((p, i) => {
+      if (i !== currentPlayerIdx) return p;
+      return {
+        ...p,
+        position: Math.min(30, p.position + spaces)
+      };
+    }));
+  }, [currentPlayerIdx]);
+  const selectDifficulty = diff => {
+    const q = randomQuestion(currentZoneId, diff, usedIds);
+    if (q) usedIds.add(q.id);
+    setCurrentQ(q);
+    setSpacesEarned(diffMap[diff]);
+    setPhase("question");
+  };
+  const handleMainAnswer = correct => {
+    if (correct) {
+      setLastResult("correct");
+      setPhase("doubleOrNothing");
+    } else {
+      setLastResult("wrong");
+      setPhase("result");
+    }
+  };
+  const acceptDon = () => {
+    const nextDiff = {
+      easy: "medium",
+      medium: "hard",
+      hard: "hard"
+    }[currentQ.difficulty];
+    const q = randomQuestion(currentZoneId, nextDiff, usedIds);
+    if (q) usedIds.add(q.id);
+    setDonQuestion(q);
+    setPhase("donq");
+  };
+  const declineDon = () => {
+    movePlayer(spacesEarned);
+    setPhase("result");
+  };
+  const handleDonAnswer = correct => {
+    if (correct) {
+      const doubled = spacesEarned * 2;
+      setSpacesEarned(doubled);
+      setLastResult("donCorrect");
+      movePlayer(doubled);
+    } else {
+      setLastResult("donWrong");
+      // No movement on lost double-or-nothing
+    }
+    setPhase("result");
+  };
+  const nextTurn = () => {
+    const winner = players.find(p => p.position >= 30);
+    if (winner) {
+      setPhase("gameOver");
+      return;
+    }
+    setCurrentPlayerIdx(i => (i + 1) % players.length);
+    setPhase("selectDifficulty");
+    setCurrentQ(null);
+    setDonQuestion(null);
+    setLastResult(null);
+    setSpacesEarned(0);
+  };
+  const resetGame = () => {
+    setPlayerCount(null);
+    setNames(["", "", "", ""]);
+    setPlayers([]);
+    setSetupDone(false);
+    setCurrentPlayerIdx(0);
+    setPhase("selectDifficulty");
+    setCurrentQ(null);
+    setDonQuestion(null);
+    setSpacesEarned(0);
+    usedIds.clear();
+    setLastResult(null);
+  };
+
+  // ─── Phase: pick player count ─────────────────────────
+  if (!playerCount) {
+    return /*#__PURE__*/React.createElement("div", {
+      className: "space-y-4"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "text-center"
+    }, /*#__PURE__*/React.createElement("h2", {
+      className: "text-xl font-bold text-gray-800 mb-1"
+    }, "\uD83E\uDDEC Board Game Mode"), /*#__PURE__*/React.createElement("p", {
+      className: "text-sm text-gray-500"
+    }, "Race to space 30 across 5 topic zones")), /*#__PURE__*/React.createElement("div", {
+      className: "space-y-2"
+    }, /*#__PURE__*/React.createElement("p", {
+      className: "text-sm font-medium text-gray-700 text-center"
+    }, "How many players?"), [2, 3, 4].map(n => /*#__PURE__*/React.createElement("button", {
+      key: n,
+      onClick: () => setPlayerCount(n),
+      className: "w-full py-4 rounded-xl border-2 border-gray-200 bg-white hover:bg-blue-50 hover:border-blue-400 font-bold text-lg transition-all"
+    }, n, " Players"))));
+  }
+
+  // ─── Phase: enter player names ────────────────────────
+  if (!setupDone) {
+    const ready = names.slice(0, playerCount).every(n => n.trim().length > 0);
+    return /*#__PURE__*/React.createElement("div", {
+      className: "space-y-4"
+    }, /*#__PURE__*/React.createElement("h2", {
+      className: "text-lg font-bold text-center"
+    }, "Enter player names"), Array(playerCount).fill(0).map((_, i) => /*#__PURE__*/React.createElement("div", {
+      key: i,
+      className: "flex items-center gap-3"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: `w-8 h-8 rounded-full ${PCOLORS[i].bg} flex-shrink-0 flex items-center justify-center text-white text-xs font-bold`
+    }, i + 1), /*#__PURE__*/React.createElement("input", {
+      value: names[i],
+      onChange: e => {
+        const n = [...names];
+        n[i] = e.target.value;
+        setNames(n);
+      },
+      placeholder: `Player ${i + 1} name`,
+      maxLength: 20,
+      className: "flex-1 border-2 border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-400"
+    }))), /*#__PURE__*/React.createElement("button", {
+      onClick: () => {
+        const newPlayers = names.slice(0, playerCount).map((name, i) => ({
+          id: i,
+          name: name.trim() || `Player ${i + 1}`,
+          position: 1,
+          colorIdx: i
+        }));
+        setPlayers(newPlayers);
+        setSetupDone(true);
+      },
+      disabled: !ready,
+      className: `w-full py-3 rounded-xl font-bold text-white transition-all ${ready ? "bg-blue-600 hover:bg-blue-700" : "bg-gray-300 cursor-not-allowed"}`
+    }, "Start Game \u2192"));
+  }
+
+  // ─── Phase: game over ─────────────────────────────────
+  if (phase === "gameOver") {
+    const sorted = [...players].sort((a, b) => b.position - a.position);
+    const winner = sorted[0];
+    return /*#__PURE__*/React.createElement("div", {
+      className: "text-center space-y-4"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "text-6xl"
+    }, "\uD83C\uDFC6"), /*#__PURE__*/React.createElement("h2", {
+      className: "text-2xl font-bold"
+    }, winner.name, " wins!"), /*#__PURE__*/React.createElement("p", {
+      className: "text-gray-600"
+    }, "Reached space ", winner.position, " first"), /*#__PURE__*/React.createElement("div", {
+      className: "space-y-2 text-left"
+    }, sorted.map((p, i) => /*#__PURE__*/React.createElement("div", {
+      key: p.id,
+      className: `flex items-center gap-3 p-3 rounded-xl ${i === 0 ? "bg-yellow-50 border-2 border-yellow-400" : "bg-gray-50 border border-gray-200"}`
+    }, /*#__PURE__*/React.createElement("div", {
+      className: `w-8 h-8 rounded-full ${PCOLORS[p.colorIdx].bg}`
+    }), /*#__PURE__*/React.createElement("span", {
+      className: "font-bold"
+    }, p.name), /*#__PURE__*/React.createElement("span", {
+      className: "ml-auto text-gray-600"
+    }, "Space ", p.position), i === 0 && /*#__PURE__*/React.createElement("span", null, "\uD83D\uDC51")))), /*#__PURE__*/React.createElement("button", {
+      onClick: resetGame,
+      className: "w-full py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-all"
+    }, "New Game"));
+  }
+
+  // ─── Active gameplay ──────────────────────────────────
+  const pc = PCOLORS[currentPlayer.colorIdx] || PCOLORS[0];
+  return /*#__PURE__*/React.createElement("div", {
+    className: "space-y-4"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-3 p-3 rounded-xl border-2 bg-white",
+    style: {
+      borderColor: pc.hex
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: `w-10 h-10 rounded-full ${pc.bg} flex items-center justify-center text-white font-bold`
+  }, currentPlayer.name?.[0]?.toUpperCase()), /*#__PURE__*/React.createElement("div", {
+    className: "min-w-0 flex-1"
+  }, /*#__PURE__*/React.createElement("p", {
+    className: "font-bold text-sm truncate"
+  }, currentPlayer.name, "'s turn"), /*#__PURE__*/React.createElement("p", {
+    className: "text-xs text-gray-500"
+  }, "Space ", currentPlayer.position, " \u2192 ", currentZone.name)), /*#__PURE__*/React.createElement("div", {
+    className: "flex gap-1"
+  }, players.map(p => /*#__PURE__*/React.createElement("div", {
+    key: p.id,
+    title: `${p.name}: space ${p.position}`,
+    className: `w-7 h-7 rounded-full border-2 border-white ${PCOLORS[p.colorIdx].bg} flex items-center justify-center text-white text-[10px] font-bold`
+  }, p.position)))), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setShowBoard(b => !b),
+    className: "w-full py-1.5 text-xs text-blue-600 underline"
+  }, showBoard ? "▲ Hide board" : "▼ Show board"), showBoard && /*#__PURE__*/React.createElement(Board, {
+    players: players
+  }), phase === "selectDifficulty" && /*#__PURE__*/React.createElement("div", {
+    className: "space-y-3"
+  }, /*#__PURE__*/React.createElement("p", {
+    className: "text-center font-bold text-gray-700"
+  }, "Choose your difficulty:"), [{
+    d: "easy",
+    label: "Easy",
+    spaces: 1,
+    desc: "MC, T/F, or visual ID",
+    emoji: "🟢"
+  }, {
+    d: "medium",
+    label: "Medium",
+    spaces: 2,
+    desc: "Matching, sequencing, or visuals",
+    emoji: "🟡"
+  }, {
+    d: "hard",
+    label: "Hard",
+    spaces: 3,
+    desc: "Punnett, error ID, or analysis",
+    emoji: "🔴"
+  }].map(opt => /*#__PURE__*/React.createElement("button", {
+    key: opt.d,
+    onClick: () => selectDifficulty(opt.d),
+    className: `w-full text-left p-4 rounded-xl border-2 transition-all active:scale-95
+                ${opt.d === "easy" ? "border-green-300 bg-green-50 hover:border-green-500" : opt.d === "medium" ? "border-yellow-300 bg-yellow-50 hover:border-yellow-500" : "border-red-300 bg-red-50 hover:border-red-500"}`
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center justify-between"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
+    className: "text-lg mr-2"
+  }, opt.emoji), /*#__PURE__*/React.createElement("span", {
+    className: "font-bold"
+  }, opt.label), /*#__PURE__*/React.createElement("span", {
+    className: "ml-2 text-xs text-gray-600"
+  }, opt.desc)), /*#__PURE__*/React.createElement("span", {
+    className: "font-bold text-base"
+  }, "+", opt.spaces, " \uD83C\uDFC3")))), /*#__PURE__*/React.createElement("p", {
+    className: `text-xs text-center ${currentZone.text}`
+  }, "Topic: ", currentZone.emoji, " ", currentZone.name)), phase === "question" && currentQ && /*#__PURE__*/React.createElement("div", {
+    className: `p-4 rounded-2xl border-2 ${currentZone.bg} ${currentZone.border}`
+  }, /*#__PURE__*/React.createElement(QuestionDisplay, {
+    question: currentQ,
+    onAnswer: handleMainAnswer,
+    key: currentQ.id
+  })), phase === "question" && !currentQ && /*#__PURE__*/React.createElement("div", {
+    className: "p-4 rounded-2xl border-2 border-orange-300 bg-orange-50 text-center space-y-3"
+  }, /*#__PURE__*/React.createElement("p", {
+    className: "font-bold"
+  }, "No question available for this difficulty."), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setPhase("selectDifficulty"),
+    className: "px-4 py-2 bg-blue-600 text-white rounded-xl"
+  }, "Back")), phase === "doubleOrNothing" && /*#__PURE__*/React.createElement("div", {
+    className: "text-center space-y-4 p-4 bg-gradient-to-br from-yellow-50 to-orange-50 rounded-2xl border-2 border-yellow-400"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "text-4xl"
+  }, "\u26A1"), /*#__PURE__*/React.createElement("h3", {
+    className: "text-lg font-bold"
+  }, "Double or Nothing!"), /*#__PURE__*/React.createElement("p", {
+    className: "text-sm text-gray-700"
+  }, "You earned ", /*#__PURE__*/React.createElement("strong", null, spacesEarned, " space", spacesEarned > 1 ? "s" : ""), ".", /*#__PURE__*/React.createElement("br", null), "Answer a harder question to ", /*#__PURE__*/React.createElement("strong", null, "double to ", spacesEarned * 2), ",", /*#__PURE__*/React.createElement("br", null), "or get nothing this turn."), /*#__PURE__*/React.createElement("div", {
+    className: "flex gap-3"
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: declineDon,
+    className: "flex-1 py-3 bg-gray-200 text-gray-700 rounded-xl font-bold hover:bg-gray-300 transition-all"
+  }, "Keep ", spacesEarned, " \u2713"), /*#__PURE__*/React.createElement("button", {
+    onClick: acceptDon,
+    className: "flex-1 py-3 bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-xl font-bold hover:opacity-90 transition-all"
+  }, "Double it! \u26A1"))), phase === "donq" && donQuestion && /*#__PURE__*/React.createElement("div", {
+    className: "p-4 rounded-2xl border-2 border-orange-400 bg-orange-50"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "text-center mb-3"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-xs font-bold text-orange-700 bg-orange-100 px-2 py-1 rounded-full"
+  }, "\u26A1 DOUBLE OR NOTHING")), /*#__PURE__*/React.createElement(QuestionDisplay, {
+    question: donQuestion,
+    onAnswer: handleDonAnswer,
+    key: donQuestion.id
+  })), phase === "donq" && !donQuestion && /*#__PURE__*/React.createElement("div", {
+    className: "p-4 rounded-2xl border-2 border-orange-300 bg-orange-50 text-center"
+  }, /*#__PURE__*/React.createElement("p", null, "No follow-up question available \u2014 keeping your ", spacesEarned, " space(s)."), /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      movePlayer(spacesEarned);
+      setPhase("result");
+      setLastResult("correct");
+    },
+    className: "mt-3 px-4 py-2 bg-blue-600 text-white rounded-xl"
+  }, "Continue")), phase === "result" && /*#__PURE__*/React.createElement("div", {
+    className: `p-4 rounded-2xl text-center space-y-3 ${lastResult === "donWrong" ? "bg-red-50 border-2 border-red-300" : lastResult === "wrong" ? "bg-gray-50 border-2 border-gray-300" : "bg-green-50 border-2 border-green-300"}`
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "text-4xl"
+  }, lastResult === "donWrong" ? "💥" : lastResult === "wrong" ? "😬" : "🎉"), /*#__PURE__*/React.createElement("h3", {
+    className: "font-bold text-lg"
+  }, lastResult === "donWrong" ? "Doubled down… and lost!" : lastResult === "wrong" ? "No movement this turn" : lastResult === "donCorrect" ? `Doubled! Moved ${spacesEarned} spaces!` : `Moved ${spacesEarned} space${spacesEarned > 1 ? "s" : ""}!`), /*#__PURE__*/React.createElement("p", {
+    className: "text-sm text-gray-700"
+  }, currentPlayer.name, " \u2192 Space ", currentPlayer.position), /*#__PURE__*/React.createElement("button", {
+    onClick: nextTurn,
+    className: "w-full py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-all"
+  }, currentPlayer.position >= 30 ? "See Final Standings →" : `${players[(currentPlayerIdx + 1) % players.length]?.name}'s Turn →`)));
+}
+
+// ════════════════════════════════════════════════════════════
+// SOLO STUDY MODE
+// ════════════════════════════════════════════════════════════
+function SoloMode() {
+  const [phase, setPhase] = useState("setup"); // setup | study
+  const [selectedZone, setSelectedZone] = useState(null);
+  const [selectedDiff, setSelectedDiff] = useState(null);
+  const [currentQ, setCurrentQ] = useState(null);
+  const [score, setScore] = useState({
+    correct: 0,
+    total: 0
+  });
+  const [usedIds] = useState(() => new Set());
+  const pickQuestion = () => {
+    const zone = selectedZone === 0 ? Math.ceil(Math.random() * 5) : selectedZone;
+    const diffs = selectedDiff === "all" ? ["easy", "medium", "hard"] : [selectedDiff];
+    const diff = diffs[Math.floor(Math.random() * diffs.length)];
+    return randomQuestion(zone, diff, usedIds);
+  };
+  const startSession = () => {
+    const q = pickQuestion();
+    if (q) usedIds.add(q.id);
+    setCurrentQ(q);
+    setPhase("study");
+  };
+  const nextQ = () => {
+    const q = pickQuestion();
+    if (q) usedIds.add(q.id);
+    setCurrentQ(q);
+  };
+  const handleAnswer = correct => {
+    setScore(s => ({
+      correct: s.correct + (correct ? 1 : 0),
+      total: s.total + 1
+    }));
+  };
+  if (phase === "setup") {
+    return /*#__PURE__*/React.createElement("div", {
+      className: "space-y-5"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "text-center"
+    }, /*#__PURE__*/React.createElement("h2", {
+      className: "text-xl font-bold text-gray-800"
+    }, "\uD83D\uDCDA Solo Study Mode"), /*#__PURE__*/React.createElement("p", {
+      className: "text-sm text-gray-500 mt-1"
+    }, "No pressure \u2014 learn at your own pace")), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("p", {
+      className: "text-sm font-semibold text-gray-700 mb-2"
+    }, "Choose a topic zone:"), /*#__PURE__*/React.createElement("div", {
+      className: "space-y-2"
+    }, /*#__PURE__*/React.createElement("button", {
+      onClick: () => setSelectedZone(0),
+      className: `w-full p-3 rounded-xl border-2 text-sm font-medium transition-all ${selectedZone === 0 ? "border-blue-500 bg-blue-50" : "border-gray-200 bg-white hover:border-gray-300"}`
+    }, "\uD83C\uDF10 All Zones (random)"), ZONES.map(z => /*#__PURE__*/React.createElement("button", {
+      key: z.id,
+      onClick: () => setSelectedZone(z.id),
+      className: `w-full p-3 rounded-xl border-2 text-sm font-medium transition-all text-left ${selectedZone === z.id ? `${z.border} ${z.bg}` : "border-gray-200 bg-white hover:border-gray-300"}`
+    }, z.emoji, " Zone ", z.id, ": ", z.name)))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("p", {
+      className: "text-sm font-semibold text-gray-700 mb-2"
+    }, "Choose difficulty:"), /*#__PURE__*/React.createElement("div", {
+      className: "grid grid-cols-2 gap-2"
+    }, [{
+      v: "all",
+      l: "All difficulties"
+    }, {
+      v: "easy",
+      l: "🟢 Easy"
+    }, {
+      v: "medium",
+      l: "🟡 Medium"
+    }, {
+      v: "hard",
+      l: "🔴 Hard"
+    }].map(opt => /*#__PURE__*/React.createElement("button", {
+      key: opt.v,
+      onClick: () => setSelectedDiff(opt.v),
+      className: `p-3 rounded-xl border-2 text-sm font-medium transition-all ${selectedDiff === opt.v ? "border-blue-500 bg-blue-50" : "border-gray-200 bg-white hover:border-gray-300"}`
+    }, opt.l)))), /*#__PURE__*/React.createElement("button", {
+      onClick: startSession,
+      disabled: selectedZone === null || !selectedDiff,
+      className: `w-full py-4 rounded-xl font-bold text-white text-lg transition-all ${selectedZone !== null && selectedDiff ? "bg-blue-600 hover:bg-blue-700" : "bg-gray-300 cursor-not-allowed"}`
+    }, "Start Studying \u2192"));
+  }
+  const pct = score.total > 0 ? Math.round(100 * score.correct / score.total) : 0;
+  return /*#__PURE__*/React.createElement("div", {
+    className: "space-y-4"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-3 p-3 bg-gray-50 rounded-xl border"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex-1 min-w-0"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex justify-between text-xs text-gray-600 mb-1"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "font-semibold"
+  }, "Score: ", score.correct, "/", score.total), /*#__PURE__*/React.createElement("span", null, score.total > 0 ? pct + "%" : "—")), /*#__PURE__*/React.createElement("div", {
+    className: "h-2 bg-gray-200 rounded-full overflow-hidden"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: `h-full rounded-full transition-all ${pct >= 80 ? "bg-green-500" : pct >= 60 ? "bg-yellow-500" : "bg-blue-500"}`,
+    style: {
+      width: score.total > 0 ? pct + "%" : "0%"
+    }
+  }))), /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      setPhase("setup");
+      setScore({
+        correct: 0,
+        total: 0
+      });
+      usedIds.clear();
+    },
+    className: "text-xs text-gray-400 hover:text-gray-600 underline whitespace-nowrap"
+  }, "New session")), currentQ ? /*#__PURE__*/React.createElement("div", {
+    className: `p-4 rounded-2xl border-2 ${getZone(currentQ.zone).bg} ${getZone(currentQ.zone).border}`
+  }, /*#__PURE__*/React.createElement(QuestionDisplay, {
+    question: currentQ,
+    onAnswer: handleAnswer,
+    key: currentQ.id
+  })) : /*#__PURE__*/React.createElement("div", {
+    className: "p-6 rounded-2xl border-2 border-orange-200 bg-orange-50 text-center"
+  }, /*#__PURE__*/React.createElement("p", {
+    className: "font-bold"
+  }, "No more fresh questions in this zone & difficulty."), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setPhase("setup"),
+    className: "mt-3 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm"
+  }, "Pick another")), /*#__PURE__*/React.createElement("button", {
+    onClick: nextQ,
+    className: "w-full py-3 bg-gray-800 text-white rounded-xl font-bold hover:bg-gray-700 transition-all"
+  }, "Next Question \u2192"));
+}
+
+// ════════════════════════════════════════════════════════════
+// HOME SCREEN
+// ════════════════════════════════════════════════════════════
+function HomeScreen({
+  onMode
+}) {
+  return /*#__PURE__*/React.createElement("div", {
+    className: "space-y-5"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "text-center pt-2"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "text-5xl mb-2"
+  }, "\uD83E\uDDEC"), /*#__PURE__*/React.createElement("h1", {
+    className: "text-2xl font-black text-gray-900 tracking-tight"
+  }, "Bio376 Genetics"), /*#__PURE__*/React.createElement("h2", {
+    className: "text-xl font-black text-blue-600 tracking-tight"
+  }, "Review Game"), /*#__PURE__*/React.createElement("p", {
+    className: "text-xs text-gray-500 mt-1"
+  }, "UH Hilo \u2022 Spring 2026")), /*#__PURE__*/React.createElement("div", {
+    className: "grid grid-cols-5 gap-1"
+  }, ZONES.map(z => /*#__PURE__*/React.createElement("div", {
+    key: z.id,
+    className: `p-2 rounded-xl ${z.bg} border ${z.border} text-center`
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "text-xl"
+  }, z.emoji), /*#__PURE__*/React.createElement("div", {
+    className: `text-[10px] font-bold ${z.text} leading-tight mt-1`
+  }, z.short)))), /*#__PURE__*/React.createElement("div", {
+    className: "space-y-3"
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => onMode("solo"),
+    className: "w-full p-5 rounded-2xl bg-gradient-to-r from-blue-600 to-blue-700 text-white text-left hover:from-blue-700 hover:to-blue-800 transition-all active:scale-95 shadow-lg"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "text-2xl mb-1"
+  }, "\uD83D\uDCDA"), /*#__PURE__*/React.createElement("div", {
+    className: "font-black text-lg"
+  }, "Solo Study Mode"), /*#__PURE__*/React.createElement("div", {
+    className: "text-blue-200 text-sm"
+  }, "Practice any topic at your own pace")), /*#__PURE__*/React.createElement("button", {
+    onClick: () => onMode("multi"),
+    className: "w-full p-5 rounded-2xl bg-gradient-to-r from-purple-600 to-pink-600 text-white text-left hover:from-purple-700 hover:to-pink-700 transition-all active:scale-95 shadow-lg"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "text-2xl mb-1"
+  }, "\uD83C\uDFB2"), /*#__PURE__*/React.createElement("div", {
+    className: "font-black text-lg"
+  }, "Board Game Mode"), /*#__PURE__*/React.createElement("div", {
+    className: "text-purple-200 text-sm"
+  }, "2\u20134 players race across 30 spaces \u2022 Double-or-Nothing!"))), /*#__PURE__*/React.createElement("div", {
+    className: "text-center text-xs text-gray-500 space-y-1 pb-2"
+  }, /*#__PURE__*/React.createElement("p", {
+    className: "font-semibold"
+  }, QUESTIONS.length, " questions \xB7 11 question types"), /*#__PURE__*/React.createElement("p", null, "Including \uD83E\uDDEC karyotype \xB7 \uD83D\uDCCA pedigree \xB7 \uD83D\uDD2C cell-stage"), /*#__PURE__*/React.createElement("p", null, "\uD83E\uDDEA gel \xB7 \u2697\uFE0F codon visual questions")));
+}
+
+// ════════════════════════════════════════════════════════════
+// APP ROOT
+// ════════════════════════════════════════════════════════════
+function App() {
+  const [screen, setScreen] = useState("home");
+  return /*#__PURE__*/React.createElement("div", {
+    className: "min-h-screen bg-gradient-to-br from-slate-100 to-blue-50 flex items-start justify-center p-4"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "w-full max-w-sm bg-white rounded-3xl shadow-2xl overflow-hidden"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "bg-gradient-to-r from-blue-700 to-purple-700 px-4 py-3 flex items-center gap-2"
+  }, screen !== "home" && /*#__PURE__*/React.createElement("button", {
+    onClick: () => setScreen("home"),
+    className: "text-white opacity-70 hover:opacity-100 transition-opacity mr-1 text-lg"
+  }, "\u2190"), /*#__PURE__*/React.createElement("span", {
+    className: "text-white font-black text-sm tracking-wide flex-1 text-center"
+  }, screen === "home" ? "BIO 376 GENETICS REVIEW" : screen === "solo" ? "SOLO STUDY" : "BOARD GAME"), /*#__PURE__*/React.createElement("span", {
+    className: "text-white opacity-50 text-xs"
+  }, "UH Hilo")), /*#__PURE__*/React.createElement("div", {
+    className: "p-4 overflow-y-auto",
+    style: {
+      maxHeight: "calc(100vh - 100px)"
+    }
+  }, screen === "home" && /*#__PURE__*/React.createElement(HomeScreen, {
+    onMode: setScreen
+  }), screen === "solo" && /*#__PURE__*/React.createElement(SoloMode, null), screen === "multi" && /*#__PURE__*/React.createElement(MultiplayerGame, {
+    key: "multi"
+  }))));
+}
+// Mount the React app
+const root = ReactDOM.createRoot(document.getElementById("root"));
+root.render(React.createElement(App));
+</script>
+</body>
+</html>  name: "Ocean",
   bg: "bg-blue-500",
   ring: "ring-blue-500",
   hex: "#2563EB"
