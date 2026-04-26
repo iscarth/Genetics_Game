@@ -2586,6 +2586,8 @@ function SoloMode() {
       correct: s.correct + (correct ? 1 : 0),
       total: s.total + 1
     }));
+    // Advance to next question — Continue button in QuestionDisplay calls this
+    nextQ();
   };
   if (phase === "setup") {
     return /*#__PURE__*/React.createElement("div", {
@@ -2676,8 +2678,8 @@ function SoloMode() {
     className: "mt-3 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm"
   }, "Pick another")), /*#__PURE__*/React.createElement("button", {
     onClick: nextQ,
-    className: "w-full py-3 bg-gray-800 text-white rounded-xl font-bold hover:bg-gray-700 transition-all"
-  }, "Next Question \u2192"));
+    className: "w-full py-2.5 bg-gray-200 text-gray-700 rounded-xl font-medium text-sm hover:bg-gray-300 transition-all"
+  }, "Skip this question \u2192"));
 }
 
 // ════════════════════════════════════════════════════════════
